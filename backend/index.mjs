@@ -62,6 +62,43 @@ app.get("/strava/callback", async (req, res) => {
   }
 });
 
+app.get("/strava/latest-activity", async (req, res) => {
+  const accessToken = req.query.token;
+
+  if (!accessToken) {
+    return res.status(400).json({ error: "Missing access token" });
+  }
+
+  try {
+    const response = await axios.get(
+      "https://www.strava.com/api/v3/athlete/activities",
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`
+        },
+        params: {
+          per_page: 1
+        }
+      }
+    );
+
+    const activity = response.data[0];
+
+    res.json({
+      id: activity.id,
+      name: activity.name,
+      distance_m: activity.distance,
+      moving_time_s: activity.moving_time,
+      start_latlng: activity.start_latlng,
+      end_latlng: activity.end_latlng,
+      polyline: activity.map.summary_polyline
+    });
+
+  } catch (err) {
+    res.status(500).json({ error: "Unable to fetch activity" });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`Server started on http://localhost:${PORT}`);
 });
