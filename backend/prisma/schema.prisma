@@ -1,0 +1,49 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id              Int      @id @default(autoincrement())
+  stravaAthleteId BigInt   @unique
+  username        String?
+  firstname       String?
+  lastname        String?
+  profile         String?
+  createdAt       DateTime @default(now())
+
+  activities      Activity[]
+  tiles           TileOwnership[]
+}
+
+model Activity {
+  id            Int      @id @default(autoincrement())
+  stravaId      BigInt   @unique
+  userId        Int
+  name          String?
+  distanceM     Float?
+  movingTimeS   Int?
+  startLat      Float?
+  startLng      Float?
+  endLat        Float?
+  endLng        Float?
+  polyline      String?
+  captured      Boolean  @default(false) // true if start-end <=200m rule passes
+  createdAt     DateTime @default(now())
+
+  user          User     @relation(fields: [userId], references: [id])
+}
+
+model TileOwnership {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  tileId    String   // H3 tile id or grid tile string
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@unique([tileId]) // only one owner per tile
+}
