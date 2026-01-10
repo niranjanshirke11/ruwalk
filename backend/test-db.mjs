@@ -1,12 +1,27 @@
 import pkg from "@prisma/client";
+import { PrismaPg } from "@prisma/adapter-pg";
+import pgPkg from "pg";
+import dotenv from "dotenv";
+
+dotenv.config();
+
 const { PrismaClient } = pkg;
-const prisma = new PrismaClient();
+const { Pool } = pgPkg;
+
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+const adapter = new PrismaPg(pool);
+const prisma = new PrismaClient({ adapter });
 
 async function main() {
-  const users = await prisma.user.findMany();
-  console.log("Users:", users);
+  try {
+    const users = await prisma.user.findMany();
+    console.log("Users:", users);
+  } catch (error) {
+    console.error("Database Test Error:", error);
+  } finally {
+    await prisma.$disconnect();
+    await pool.end();
+  }
 }
 
-main()
-  .catch(console.error)
-  .finally(() => prisma.$disconnect());
+main();
