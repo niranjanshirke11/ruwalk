@@ -31,6 +31,7 @@ const PORT = process.env.PORT || 4000;
 
 // Enable CORS for all routes
 app.use(cors());
+app.use(express.json());
 
 app.get('/', (req, res) => {
   res.send('Ruwalk Backend Running');
@@ -309,25 +310,57 @@ app.get("/strava/sync-latest", async (req, res) => {
 });
 
 app.get("/leaderboard", async (req, res) => {
-  const leaderboard = await prisma.user.findMany({
-    select: {
-      id: true,
-      firstname: true,
-      lastname: true,
-      username: true,
-      profile: true,
-      _count: {
-        select: { tiles: true }
+  try {
+    const users = await prisma.user.findMany({
+      select: {
+        id: true,
+        firstname: true,
+        lastname: true,
+        username: true,
+        profile: true,
+        tiles: {
+          select: { tileId: true }
+        },
+        activities: {
+          where: { captured: true },
+          select: { distanceM: true }
+        }
       }
-    },
-    orderBy: {
-      tiles: { _count: "desc" }
-    },
-    take: 50
-  });
+    });
 
-  res.json(leaderboard);
+    const leaderboard = users.map((u) => {
+      const tileCount = u.tiles.length;
+
+      const totalDistanceM = u.activities.reduce((sum, a) => {
+        return sum + (a.distanceM || 0);
+      }, 0);
+
+      const totalKm = totalDistanceM / 1000;
+
+      return {
+        id: u.id,
+        firstname: u.firstname,
+        lastname: u.lastname,
+        username: u.username,
+        profile: u.profile,
+        tiles: tileCount,
+        totalKm: Number(totalKm.toFixed(2))
+      };
+    });
+
+    // Sort by tiles desc first, then totalKm desc
+    leaderboard.sort((a, b) => {
+      if (b.tiles !== a.tiles) return b.tiles - a.tiles;
+      return b.totalKm - a.totalKm;
+    });
+
+    res.json(leaderboard.slice(0, 50));
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Leaderboard failed" });
+  }
 });
+
 
 app.get("/tiles/my", async (req, res) => {
   const { athleteId } = req.query;
@@ -351,6 +384,129 @@ app.get("/tiles/my", async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ error: "Failed to fetch tiles" });
+  }
+});
+
+// DEV RESET Endpoint
+app.post("/dev/reset", async (req, res) => {
+  if (process.env.DEV_MODE !== "true") {
+    return res.status(403).json({ error: "DEV_MODE disabled" });
+  }
+
+  try {
+    await prisma.tileOwnership.deleteMany();
+    await prisma.activity.deleteMany();
+    await prisma.user.deleteMany();
+
+    res.json({ message: "Database reset successful ✅" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Reset failed" });
+  }
+});
+
+// DEV SEED Endpoint
+app.post("/dev/seed", async (req, res) => {
+  if (process.env.DEV_MODE !== "true") {
+    return res.status(403).json({ error: "DEV_MODE disabled" });
+  }
+
+  try {
+    // 1) Create dummy users
+    const dummyUsers = [
+      { firstname: "Amit", lastname: "Runner", username: "amit_run" },
+      { firstname: "Neha", lastname: "Walker", username: "neha_walk" },
+      { firstname: "Ravi", lastname: "Sprinter", username: "ravi_sprint" },
+      { firstname: "Sara", lastname: "Jogger", username: "sara_jog" },
+      { firstname: "Karan", lastname: "Hiker", username: "karan_hike" },
+      { firstname: "Pooja", lastname: "Strider", username: "pooja_stride" }
+    ];
+
+    const createdUsers = [];
+
+    for (let i = 0; i < dummyUsers.length; i++) {
+      const u = dummyUsers[i];
+
+      const user = await prisma.user.create({
+        data: {
+          // fake athlete ids (must be unique BigInt)
+          stravaAthleteId: BigInt(9000000000 + i),
+          firstname: u.firstname,
+          lastname: u.lastname,
+          username: u.username,
+          profile: null
+        }
+      });
+
+      createdUsers.push(user);
+    }
+
+    // 2) Seed tiles around Pune (H3 resolution 7)
+    // Pune center: 18.5204, 73.8567
+    const RES = 7;
+    const baseLat = 18.5204;
+    const baseLng = 73.8567;
+
+    // Helper: create random tile positions around Pune
+    function randomLatLng(radius = 0.03) {
+      const lat = baseLat + (Math.random() - 0.5) * radius;
+      const lng = baseLng + (Math.random() - 0.5) * radius;
+      return { lat, lng };
+    }
+
+    let tileInsertCount = 0;
+
+    for (let i = 0; i < createdUsers.length; i++) {
+      const user = createdUsers[i];
+
+      // each user gets different amount of tiles
+      const tileCount = 25 + i * 10; // 25,35,45,55,65,75
+
+      for (let t = 0; t < tileCount; t++) {
+        const { lat, lng } = randomLatLng();
+
+        const tileId = latLngToCell(lat, lng, RES);
+
+        await prisma.tileOwnership.upsert({
+          where: { tileId },
+          update: { userId: user.id }, // overwrite owner to create stealing overlaps
+          create: {
+            tileId,
+            userId: user.id
+          }
+        });
+
+        tileInsertCount++;
+      }
+
+      // 3) Create fake captured activities (distance affects leaderboard)
+      const km = 2 + i * 1.7; // increasing distance
+      await prisma.activity.create({
+        data: {
+          stravaId: BigInt(8000000000 + i),
+          userId: user.id,
+          name: `Dummy Run ${i + 1}`,
+          distanceM: km * 1000,
+          movingTimeS: 800 + i * 200,
+          startLat: baseLat,
+          startLng: baseLng,
+          endLat: baseLat,
+          endLng: baseLng,
+          polyline: null,
+          captured: true
+        }
+      });
+    }
+
+    res.json({
+      message: "Dummy users + territory seeded ✅",
+      users: createdUsers.length,
+      tiles_attempted: tileInsertCount,
+      note: "Tiles may overlap causing ownership stealing (intended)"
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Seed failed" });
   }
 });
 

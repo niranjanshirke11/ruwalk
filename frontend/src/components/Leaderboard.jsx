@@ -42,7 +42,8 @@ export default function Leaderboard() {
       ) : (
         <div className="space-y-3">
           {data.map((user, index) => {
-            const tiles = user?._count?.tiles ?? 0;
+            const tiles = user.tiles ?? 0;
+            const totalKm = user.totalKm ?? 0;
             const name = (user.firstname || "") + " " + (user.lastname || "");
             const username = user.username ? `@${user.username}` : "";
 
@@ -66,7 +67,7 @@ export default function Leaderboard() {
 
                 <div className="text-right">
                   <p className="font-bold text-lg">{tiles}</p>
-                  <p className="text-xs text-gray-500">tiles</p>
+                  <p className="text-xs text-gray-500">tiles • {totalKm} km</p>
                 </div>
               </div>
             );
