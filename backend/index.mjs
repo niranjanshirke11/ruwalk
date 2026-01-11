@@ -329,6 +329,31 @@ app.get("/leaderboard", async (req, res) => {
   res.json(leaderboard);
 });
 
+app.get("/tiles/my", async (req, res) => {
+  const { athleteId } = req.query;
+
+  if (!athleteId) {
+    return res.status(400).json({ error: "Missing athleteId" });
+  }
+
+  try {
+    const user = await prisma.user.findUnique({
+      where: { stravaAthleteId: BigInt(athleteId) },
+      include: { tiles: true }
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    res.json({
+      tiles: user.tiles.map(t => t.tileId)
+    });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to fetch tiles" });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`Server started on http://localhost:${PORT}`);
 });

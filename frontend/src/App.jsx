@@ -1,49 +1,53 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import TerritoryMap from "./components/TerritoryMap";
 
 export default function App() {
-  const [status, setStatus] = useState("Checking...");
-  const [activity, setActivity] = useState(null);
+  const [tiles, setTiles] = useState([]);
+  const [loading, setLoading] = useState(false);
 
-  async function fetchActivity() {
-    const token = prompt("Paste your Strava access token:");
+  async function loadMyTiles() {
+    const athleteId = prompt("Enter your Strava athleteId:");
 
-    const res = await fetch(
-      `http://localhost:4000/strava/latest-activity?token=${token}`
-    );
+    if (!athleteId) return;
 
-    const data = await res.json();
-    setActivity(data);
+    setLoading(true);
+    try {
+      const res = await fetch(
+        `http://localhost:4000/tiles/my?athleteId=${athleteId}`
+      );
+      const data = await res.json();
+      setTiles(data.tiles || []);
+    } catch {
+      alert("Failed to load tiles");
+    } finally {
+      setLoading(false);
+    }
   }
 
-  useEffect(() => {
-    fetch("http://localhost:4000/api/status")
-      .then((res) => res.json())
-      .then((data) => setStatus(data.status))
-      .catch(() => setStatus("Failed"));
-  }, []);
-
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 p-4">
-      <h1 className="text-3xl font-bold mb-4">Ruwalk</h1>
-      <p className="text-gray-600 mb-6">
-        Post-run territory capture using Strava
-      </p>
+    <div className="min-h-screen bg-gray-100 p-4">
+      <div className="max-w-5xl mx-auto">
+        <div className="flex items-center justify-between gap-3 mb-6">
+          <div>
+            <h1 className="text-3xl font-bold">Ruwalk</h1>
+            <p className="text-gray-600">
+              Post-run territory capture using Strava
+            </p>
+          </div>
 
-      <p className="text-sm text-gray-500 mb-4">Backend Status: {status}</p>
+          <button
+            onClick={loadMyTiles}
+            className="px-5 py-3 rounded-xl bg-black text-white"
+          >
+            {loading ? "Loading..." : "Load Territory"}
+          </button>
+        </div>
 
-      <div className="space-y-4 flex flex-col items-center">
-        <button
-          onClick={fetchActivity}
-          className="px-6 py-3 bg-black text-white rounded-lg"
-        >
-          Fetch Last Run
-        </button>
+        <TerritoryMap tiles={tiles} />
 
-        {activity && (
-          <pre className="mt-4 p-3 bg-white rounded-lg text-sm">
-            {JSON.stringify(activity, null, 2)}
-          </pre>
-        )}
+        <div className="mt-4 text-sm text-gray-700">
+          Tiles loaded: <b>{tiles.length}</b>
+        </div>
       </div>
     </div>
   );
