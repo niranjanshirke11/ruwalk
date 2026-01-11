@@ -1,5 +1,6 @@
 import { useState } from "react";
 import TerritoryMap from "./components/TerritoryMap";
+import Leaderboard from "./components/Leaderboard";
 
 export default function App() {
   const [tiles, setTiles] = useState([]);
@@ -43,10 +44,17 @@ export default function App() {
           </button>
         </div>
 
-        <TerritoryMap tiles={tiles} />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2">
+            <TerritoryMap tiles={tiles} />
+            <div className="mt-4 text-sm text-gray-700">
+              Tiles loaded: <b>{tiles.length}</b>
+            </div>
+          </div>
 
-        <div className="mt-4 text-sm text-gray-700">
-          Tiles loaded: <b>{tiles.length}</b>
+          <div>
+            <Leaderboard />
+          </div>
         </div>
       </div>
     </div>
