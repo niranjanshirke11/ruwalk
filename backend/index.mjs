@@ -5,8 +5,12 @@ import axios from "axios";
 import pkg from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import pgPkg from "pg";
+import * as turf from "@turf/turf";
+
 
 dotenv.config();
+
+
 
 // Fix for BigInt serialization in JSON
 BigInt.prototype.toJSON = function () {
@@ -189,7 +193,24 @@ app.get("/strava/sync-latest", async (req, res) => {
       return res.status(404).json({ error: "No activities found" });
     }
 
-    // 4) Save activity (avoid duplicates using unique stravaId)
+    // 4) Calculate capture status (start/end distance <= 200m)
+    const start = act.start_latlng;
+    const end = act.end_latlng;
+
+    if (!start || !end) {
+      return res.status(400).json({
+        error: "Activity missing start or end coordinates"
+      });
+    }
+
+    const startPoint = turf.point([start[1], start[0]]); // [lng, lat]
+    const endPoint = turf.point([end[1], end[0]]);
+
+    const distanceKm = turf.distance(startPoint, endPoint, { units: "kilometers" });
+    const distanceM = distanceKm * 1000;
+    const isClosedRun = distanceM <= 200;
+
+    // 5) Save activity (avoid duplicates using unique stravaId)
     const savedActivity = await prisma.activity.upsert({
       where: { stravaId: BigInt(act.id) },
       update: {
@@ -200,7 +221,8 @@ app.get("/strava/sync-latest", async (req, res) => {
         startLng: act.start_latlng?.[1] ?? null,
         endLat: act.end_latlng?.[0] ?? null,
         endLng: act.end_latlng?.[1] ?? null,
-        polyline: act.map?.summary_polyline ?? null
+        polyline: act.map?.summary_polyline ?? null,
+        captured: isClosedRun
       },
       create: {
         stravaId: BigInt(act.id),
@@ -212,13 +234,18 @@ app.get("/strava/sync-latest", async (req, res) => {
         startLng: act.start_latlng?.[1] ?? null,
         endLat: act.end_latlng?.[0] ?? null,
         endLng: act.end_latlng?.[1] ?? null,
-        polyline: act.map?.summary_polyline ?? null
+        polyline: act.map?.summary_polyline ?? null,
+        captured: isClosedRun
       }
     });
 
     res.json({
       message: "Latest activity synced successfully",
-      user,
+      rule: {
+        distance_start_end_m: Math.round(distanceM),
+        captured: isClosedRun,
+        max_allowed_m: 200
+      },
       activity: savedActivity
     });
   } catch (err) {
