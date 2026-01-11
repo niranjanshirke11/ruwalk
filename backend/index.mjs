@@ -6,6 +6,9 @@ import pkg from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import pgPkg from "pg";
 import * as turf from "@turf/turf";
+import polyline from "@mapbox/polyline";
+import { latLngToCell } from "h3-js";
+
 
 
 dotenv.config();
@@ -210,6 +213,33 @@ app.get("/strava/sync-latest", async (req, res) => {
     const distanceM = distanceKm * 1000;
     const isClosedRun = distanceM <= 200;
 
+    let capturedTiles = [];
+
+    if (isClosedRun) {
+      const encoded = act.map?.summary_polyline;
+
+      if (!encoded) {
+        return res.status(400).json({ error: "No polyline found in activity" });
+      }
+
+      // decode polyline -> array of [lat, lng]
+      const points = polyline.decode(encoded);
+
+      // Choose tile resolution:
+      // 7 = city-level (good MVP)
+      // 8 = more detailed
+      const RESOLUTION = 7;
+
+      const tileSet = new Set();
+
+      for (const [lat, lng] of points) {
+        const tileId = latLngToCell(lat, lng, RESOLUTION);
+        tileSet.add(tileId);
+      }
+
+      capturedTiles = [...tileSet];
+    }
+
     // 5) Save activity (avoid duplicates using unique stravaId)
     const savedActivity = await prisma.activity.upsert({
       where: { stravaId: BigInt(act.id) },
@@ -239,12 +269,32 @@ app.get("/strava/sync-latest", async (req, res) => {
       }
     });
 
+    // 6) Save ownership:
+    if (isClosedRun && capturedTiles.length > 0) {
+      for (const tileId of capturedTiles) {
+        await prisma.tileOwnership.upsert({
+          where: { tileId },
+          update: { userId: user.id },   // 👈 overwrite owner
+          create: {
+            tileId,
+            userId: user.id
+          }
+        });
+      }
+    }
+
+
     res.json({
       message: "Latest activity synced successfully",
       rule: {
         distance_start_end_m: Math.round(distanceM),
         captured: isClosedRun,
         max_allowed_m: 200
+      },
+      tiles: {
+        resolution: 7,
+        captured_count: capturedTiles.length,
+        sample: capturedTiles.slice(0, 10)
       },
       activity: savedActivity
     });
@@ -256,6 +306,27 @@ app.get("/strava/sync-latest", async (req, res) => {
       details: errorData 
     });
   }
+});
+
+app.get("/leaderboard", async (req, res) => {
+  const leaderboard = await prisma.user.findMany({
+    select: {
+      id: true,
+      firstname: true,
+      lastname: true,
+      username: true,
+      profile: true,
+      _count: {
+        select: { tiles: true }
+      }
+    },
+    orderBy: {
+      tiles: { _count: "desc" }
+    },
+    take: 50
+  });
+
+  res.json(leaderboard);
 });
 
 app.listen(PORT, () => {
