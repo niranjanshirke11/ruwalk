@@ -387,6 +387,73 @@ app.get("/tiles/my", async (req, res) => {
   }
 });
 
+app.get("/routes/my", async (req, res) => {
+  const { athleteId } = req.query;
+
+  if (!athleteId) {
+    return res.status(400).json({ error: "Missing athleteId" });
+  }
+
+  try {
+    const user = await prisma.user.findUnique({
+      where: { stravaAthleteId: BigInt(athleteId) },
+      include: { 
+        activities: {
+          where: { captured: true },
+          select: {
+            id: true,
+            name: true,
+            distanceM: true,
+            polyline: true,
+            startLat: true,
+            startLng: true,
+            endLat: true,
+            endLng: true,
+            createdAt: true
+          }
+        }
+      }
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    res.json({
+      routes: user.activities
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to fetch routes" });
+  }
+});
+
+// ========== HELPER FUNCTIONS ==========
+
+function interpolate(a, b, t) {
+  return a + (b - a) * t;
+}
+
+// Generates a route as an array of lat/lng points between two coordinates
+function generateRoutePoints(start, end, pointsCount = 80, wiggle = 0.0015) {
+  const pts = [];
+  for (let i = 0; i < pointsCount; i++) {
+    const t = i / (pointsCount - 1);
+
+    let lat = interpolate(start.lat, end.lat, t);
+    let lng = interpolate(start.lng, end.lng, t);
+
+    // add "run-like" zig-zag wiggle
+    lat += (Math.sin(t * Math.PI * 6) * wiggle) + (Math.random() - 0.5) * wiggle;
+    lng += (Math.cos(t * Math.PI * 6) * wiggle) + (Math.random() - 0.5) * wiggle;
+
+    pts.push({ lat, lng });
+  }
+  return pts;
+}
+
+// ========== DEV ROUTES ==========
+
 // DEV RESET Endpoint
 app.post("/dev/reset", async (req, res) => {
   if (process.env.DEV_MODE !== "true") {
@@ -507,6 +574,138 @@ app.post("/dev/seed", async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Seed failed" });
+  }
+});
+
+app.post("/dev/seed-routes", async (req, res) => {
+  if (process.env.DEV_MODE !== "true") {
+    return res.status(403).json({ error: "DEV_MODE disabled" });
+  }
+
+  try {
+    const RES = 7;
+
+    // Pune center
+    const baseLat = 18.5204;
+    const baseLng = 73.8567;
+
+    // Create users if not exist (same ids as before)
+    const dummyUsers = [
+      { athleteId: 9000000000, firstname: "Amit", lastname: "Runner", username: "amit_run" },
+      { athleteId: 9000000001, firstname: "Neha", lastname: "Walker", username: "neha_walk" },
+      { athleteId: 9000000002, firstname: "Ravi", lastname: "Sprinter", username: "ravi_sprint" },
+      { athleteId: 9000000003, firstname: "Sara", lastname: "Jogger", username: "sara_jog" },
+      { athleteId: 9000000004, firstname: "Karan", lastname: "Hiker", username: "karan_hike" },
+      { athleteId: 9000000005, firstname: "Pooja", lastname: "Strider", username: "pooja_stride" }
+    ];
+
+    const users = [];
+
+    for (const u of dummyUsers) {
+      const user = await prisma.user.upsert({
+        where: { stravaAthleteId: BigInt(u.athleteId) },
+        update: {
+          firstname: u.firstname,
+          lastname: u.lastname,
+          username: u.username
+        },
+        create: {
+          stravaAthleteId: BigInt(u.athleteId),
+          firstname: u.firstname,
+          lastname: u.lastname,
+          username: u.username
+        }
+      });
+
+      users.push(user);
+    }
+
+    // Generate routes for each user
+    let totalActivities = 0;
+    let totalTiles = 0;
+
+    for (let i = 0; i < users.length; i++) {
+      const user = users[i];
+
+      // Each user gets 2 routes
+      const routeCount = 2;
+
+      for (let r = 0; r < routeCount; r++) {
+        // start/end points (spread out more to avoid overlap)
+        // Each user gets a different area based on their index
+        const offsetLat = ((i % 3) - 1) * 0.04; // -0.04, 0, +0.04
+        const offsetLng = (Math.floor(i / 3) - 1) * 0.04;
+        
+        const start = {
+          lat: baseLat + offsetLat + (Math.random() - 0.5) * 0.02,
+          lng: baseLng + offsetLng + (Math.random() - 0.5) * 0.02
+        };
+
+        // End near start (closed run simulation)
+        const end = {
+          lat: start.lat + (Math.random() - 0.5) * 0.002, // within ~200m
+          lng: start.lng + (Math.random() - 0.5) * 0.002
+        };
+
+        const points = generateRoutePoints(start, end, 90, 0.0012);
+
+        const tileSet = new Set();
+
+        for (const p of points) {
+          const tileId = latLngToCell(p.lat, p.lng, RES);
+          tileSet.add(tileId);
+        }
+
+        const tileIds = [...tileSet];
+
+        // Store tiles (ownership overwrite to allow stealing)
+        for (const tileId of tileIds) {
+          await prisma.tileOwnership.upsert({
+            where: { tileId },
+            update: { userId: user.id },
+            create: { tileId, userId: user.id }
+          });
+        }
+
+        // distance estimate (fake): based on tile count
+        const km = Math.max(1.5, tileIds.length * 0.12);
+
+        // Encode points to polyline format for map display
+        const polylineCoords = points.map(p => [p.lat, p.lng]);
+        const encodedPolyline = polyline.encode(polylineCoords);
+
+        // Fake activity
+        await prisma.activity.create({
+          data: {
+            stravaId: BigInt(8100000000 + i * 10 + r), // unique
+            userId: user.id,
+            name: `Seed Route ${r + 1} - ${user.firstname}`,
+            distanceM: km * 1000,
+            movingTimeS: Math.round(km * 420), // 7min/km approx
+            startLat: start.lat,
+            startLng: start.lng,
+            endLat: end.lat,
+            endLng: end.lng,
+            polyline: encodedPolyline,
+            captured: true
+          }
+        });
+
+        totalActivities++;
+        totalTiles += tileIds.length;
+      }
+    }
+
+    res.json({
+      message: "Realistic route seeding done ✅",
+      users: users.length,
+      activities_created: totalActivities,
+      tiles_generated: totalTiles,
+      resolution: RES
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Seed routes failed" });
   }
 });
 
