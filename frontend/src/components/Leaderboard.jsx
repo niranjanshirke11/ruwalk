@@ -69,14 +69,7 @@ export default function Leaderboard({ onSelectUser }) {
             return (
               <button
                 key={user.id}
-                onClick={() =>
-                  onSelectUser &&
-                  onSelectUser(
-                    user.stravaAthleteId
-                      ? String(user.stravaAthleteId)
-                      : user.id
-                  )
-                }
+                onClick={() => onSelectUser && onSelectUser(user.id)}
                 className="w-full flex items-center justify-between hover:bg-gray-50 transition-all rounded-2xl p-4 text-left group border border-transparent hover:border-gray-100"
               >
                 <div className="flex items-center gap-4">
@@ -85,10 +78,10 @@ export default function Leaderboard({ onSelectUser }) {
                       index === 0
                         ? "bg-yellow-100 text-yellow-700"
                         : index === 1
-                        ? "bg-gray-100 text-gray-700"
-                        : index === 2
-                        ? "bg-orange-100 text-orange-700"
-                        : "bg-gray-50 text-gray-400"
+                          ? "bg-gray-100 text-gray-700"
+                          : index === 2
+                            ? "bg-orange-100 text-orange-700"
+                            : "bg-gray-50 text-gray-400"
                     }`}
                   >
                     {index + 1}

@@ -3,119 +3,193 @@ import TerritoryMap from "./components/TerritoryMap";
 import Leaderboard from "./components/Leaderboard";
 
 export default function App() {
+  const [currentUser, setCurrentUser] = useState(null);
   const [currentTiles, setCurrentTiles] = useState([]);
-  const [historyTiles, setHistoryTiles] = useState([]); // array of tileIds (historical captures)
-  const [routes, setRoutes] = useState([]); // array of decoded polylines or geojson lines
+  const [historyTiles, setHistoryTiles] = useState([]);
+  const [routes, setRoutes] = useState([]);
   const [loading, setLoading] = useState(false);
   const [isMapReady, setIsMapReady] = useState(false);
 
-  // Provide a ref to allow child map component to notify readiness
   const mapReadyRef = useRef({ setIsMapReady });
 
-  // Called by TerritoryMap when map 'load' fired
   function handleMapReady() {
     setIsMapReady(true);
   }
 
-  // main loader for a user (by athleteId)
-  async function loadUserTerritory(athleteId) {
-    if (!athleteId) return;
+  // Check for login on mount
+  useEffect(() => {
+    // 1. Check URL for user data (redirect from backend)
+    const params = new URLSearchParams(window.location.search);
+    const userParam = params.get("user");
+    const tokenParam = params.get("token");
 
+    if (userParam) {
+      try {
+        const user = JSON.parse(userParam);
+        localStorage.setItem("currentUser", JSON.stringify(user));
+        if (tokenParam) localStorage.setItem("strava_token", tokenParam);
+        setCurrentUser(user);
+
+        // Clear URL
+        window.history.replaceState({}, document.title, "/");
+      } catch (err) {
+        console.error("Failed to parse user param", err);
+      }
+    } else {
+      // 2. Check localStorage
+      const stored = localStorage.getItem("currentUser");
+      if (stored) {
+        setCurrentUser(JSON.parse(stored));
+      }
+    }
+  }, []);
+
+  // UseEffect to load my data when logged in
+  useEffect(() => {
+    if (currentUser) {
+      loadTerritory("me");
+    }
+  }, [currentUser]);
+
+  // Unified loader: 'me' or userId
+  async function loadTerritory(target) {
     setLoading(true);
     setCurrentTiles([]);
     setHistoryTiles([]);
     setRoutes([]);
 
     try {
-      // fetch tiles (including history) and routes in parallel
-      const tilesPromise = fetch(
-        `http://localhost:4000/tiles/my?athleteId=${athleteId}&history=true`
-      ).then((r) => r.json());
+      let tilesUrl, routesUrl;
+      const headers = {};
 
-      // assume you have an endpoint that returns saved polylines for this user
-      const routesPromise = fetch(
-        `http://localhost:4000/routes/my?athleteId=${athleteId}`
-      ).then((r) => r.json());
+      if (target === "me") {
+        if (!currentUser) return;
+        tilesUrl = `http://localhost:4000/me/tiles?history=true`;
+        routesUrl = `http://localhost:4000/me/routes`;
+        headers["x-user-id"] = currentUser.id;
+      } else {
+        // Public view
+        tilesUrl = `http://localhost:4000/users/${target}/tiles?history=true`;
+        routesUrl = `http://localhost:4000/users/${target}/routes`;
+      }
 
       const [tilesResp, routesResp] = await Promise.all([
-        tilesPromise,
-        routesPromise,
+        fetch(tilesUrl, { headers }).then((r) => r.json()),
+        fetch(routesUrl, { headers }).then((r) => r.json()),
       ]);
 
-      // tilesResp: { tiles: [...], history: [{tileId, createdAt, previousUser, activityId}] }
+      if (tilesResp.error) throw new Error(tilesResp.error);
+
       setCurrentTiles(tilesResp.tiles || []);
-
-      // history tiles: we map to tileId array (you could keep full objects)
       setHistoryTiles((tilesResp.history || []).map((h) => h.tileId));
-
-      // routesResp expected to contain encoded polylines or geojson lines.
-      // Convert if necessary on client. Example: routesResp.routes = [{polyline: '...'}, ...]
       setRoutes(routesResp.routes || []);
-
-      // if the map is ready, TerritoryMap will redraw automatically via props
-      // if not ready, when mapReady is set true, the map will draw using updated props
     } catch (err) {
       console.error("Failed loading territory", err);
-      alert("Failed to load territory. See console.");
     } finally {
       setLoading(false);
     }
   }
 
-  // expose a helper so leaderboard list can call loadUserTerritory by athleteId
-  // you might pass loadUserTerritory to Leaderboard component as prop
+  function handleLogout() {
+    localStorage.removeItem("currentUser");
+    localStorage.removeItem("strava_token");
+    setCurrentUser(null);
+    setCurrentTiles([]);
+    setHistoryTiles([]);
+    setRoutes([]);
+  }
+
   return (
-    <div className="min-h-screen bg-gray-100 p-4">
+    <div className="min-h-screen bg-gray-100 p-4 font-sans">
       <div className="max-w-6xl mx-auto">
-        <div className="flex items-start justify-between gap-3 mb-6">
+        <div className="flex items-center justify-between mb-8 bg-white p-4 rounded-3xl shadow-sm border border-gray-100">
           <div>
-            <h1 className="text-3xl font-bold font-sans">Ruwalk</h1>
-            <p className="text-gray-600">Post-run territory capture</p>
+            <h1 className="text-3xl font-black tracking-tight text-gray-900">
+              Ruwalk
+            </h1>
+            <p className="text-gray-500 font-medium">
+              Capture the world, one run at a time.
+            </p>
           </div>
 
-          <div className="flex items-center gap-3">
-            <input
-              id="athleteIdInput"
-              placeholder="Enter athleteId"
-              className="px-4 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-            />
-            <button
-              onClick={() => {
-                const id = document
-                  .getElementById("athleteIdInput")
-                  .value.trim();
-                loadUserTerritory(id);
-              }}
-              className="px-6 py-2 rounded-xl bg-black text-white font-bold hover:bg-gray-800 transition-colors"
-            >
-              {loading ? "Loading..." : "Load Territory"}
-            </button>
+          <div>
+            {currentUser ? (
+              <div className="flex items-center gap-4">
+                <div className="text-right hidden sm:block">
+                  <p className="font-bold text-gray-900">
+                    {currentUser.firstname} {currentUser.lastname}
+                  </p>
+                  <p className="text-xs text-gray-500 font-medium">
+                    @{currentUser.username}
+                  </p>
+                </div>
+                {currentUser.profile && (
+                  <img
+                    src={currentUser.profile}
+                    alt="Profile"
+                    className="w-10 h-10 rounded-full border-2 border-gray-100"
+                  />
+                )}
+                <button
+                  onClick={() => loadTerritory("me")}
+                  className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-sm font-bold transition-colors"
+                >
+                  My Map
+                </button>
+                <button
+                  onClick={handleLogout}
+                  className="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl text-sm font-bold transition-colors"
+                >
+                  Logout
+                </button>
+              </div>
+            ) : (
+              <a
+                href="http://localhost:4000/strava/login"
+                className="flex items-center gap-2 px-6 py-3 bg-[#FC4C02] text-white font-bold rounded-xl hover:bg-[#e34402] transition-colors shadow-lg shadow-orange-500/20"
+              >
+                Connect Strava
+              </a>
+            )}
           </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2">
-            <TerritoryMap
-              currentTiles={currentTiles}
-              historyTiles={historyTiles}
-              routes={routes}
-              onMapReady={handleMapReady}
-            />
-            <div className="mt-4 flex gap-4 text-sm font-medium">
-              <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full">
-                Current: <b>{currentTiles.length}</b>
-              </span>
-              <span className="px-3 py-1 bg-gray-200 text-gray-600 rounded-full">
-                Historical: <b>{historyTiles.length}</b>
-              </span>
+          <div className="lg:col-span-2 space-y-4">
+            <div className="bg-white rounded-[2rem] shadow-xl overflow-hidden border border-gray-100 relative">
+              {loading && (
+                <div className="absolute inset-0 bg-white/50 backdrop-blur-sm z-10 flex items-center justify-center">
+                  <div className="animate-spin rounded-full h-12 w-12 border-4 border-gray-200 border-t-black"></div>
+                </div>
+              )}
+              <div className="aspect-[4/3] w-full">
+                <TerritoryMap
+                  currentTiles={currentTiles}
+                  historyTiles={historyTiles}
+                  routes={routes}
+                  onMapReady={handleMapReady}
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-4 px-2">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+                <span className="text-sm font-bold text-gray-600">
+                  {currentTiles.length} Current Tiles
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-gray-300"></div>
+                <span className="text-sm font-bold text-gray-600">
+                  {historyTiles.length} History
+                </span>
+              </div>
             </div>
           </div>
 
           <div>
-            {/* pass loadUserTerritory into leaderboard so clicking a row loads that user */}
-            <Leaderboard
-              onSelectUser={(athleteId) => loadUserTerritory(athleteId)}
-            />
+            <Leaderboard onSelectUser={(userId) => loadTerritory(userId)} />
           </div>
         </div>
       </div>

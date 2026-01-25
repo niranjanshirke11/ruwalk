@@ -79,7 +79,7 @@ app.get("/strava/callback", async (req, res) => {
 
     // Save or update user in the database
     console.log("[DEBUG] Upserting user into database...");
-    await prisma.user.upsert({
+    const user = await prisma.user.upsert({
       where: { stravaAthleteId: BigInt(athlete.id) },
       update: {
         username: athlete.username,
@@ -97,17 +97,25 @@ app.get("/strava/callback", async (req, res) => {
     });
     console.log("[DEBUG] Database sync complete.");
 
-    res.json({
-      message: "Strava connected successfully",
-      athlete: tokens.athlete,
-      access_token: tokens.access_token
-    });
+    const userData = {
+      id: user.id.toString(),
+      firstname: user.firstname,
+      lastname: user.lastname,
+      username: user.username,
+      profile: user.profile
+    };
+
+    // Redirect to frontend with user data
+    // In a real app, you'd use a secure cookie or a token. 
+    // For MVP, we'll pass the user object in the URL.
+    const redirectUrl = `http://localhost:5173/?user=${encodeURIComponent(JSON.stringify(userData))}&token=${tokens.access_token}`;
+    res.redirect(redirectUrl);
 
   } catch (error) {
     const errorData = error.response?.data || error.message;
     console.error("[ERROR] Strava Callback Failed:", JSON.stringify(errorData));
     res.status(500).json({ 
-      error: "Strava authhhh failed",
+      error: "Strava auth failed",
       details: errorData 
     });
   }
@@ -394,7 +402,99 @@ app.get("/leaderboard", async (req, res) => {
 });
 
 
-// GET current tiles + optional history
+// GET /me/tiles - Uses x-user-id header
+app.get("/me/tiles", async (req, res) => {
+  try {
+    const userId = req.headers["x-user-id"];
+    const { history } = req.query;
+
+    if (!userId) return res.status(400).json({ error: "Missing x-user-id header" });
+
+    // Ensure user exists
+    const user = await prisma.user.findUnique({
+      where: { id: parseInt(userId) }
+    });
+    
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    // current tiles
+    const current = await prisma.tileOwnership.findMany({
+      where: { userId: user.id },
+      select: { tileId: true }
+    });
+
+    // optional history
+    let historyList = [];
+    if (history === "true") {
+      historyList = await prisma.tileHistory.findMany({
+        where: { newUser: user.id },
+        orderBy: { createdAt: "desc" },
+        take: 200,
+        select: { tileId: true, previousUser: true, createdAt: true, activityId: true }
+      });
+    }
+
+    res.json({
+      user: {
+        id: user.id,
+        firstname: user.firstname,
+        lastname: user.lastname
+      },
+      tiles: current.map(t => t.tileId),
+      history: historyList
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "me/tiles failed" });
+  }
+});
+
+// GET /users/:id/tiles - Public profile view
+app.get("/users/:id/tiles", async (req, res) => {
+  try {
+    const userId = parseInt(req.params.id);
+    const { history } = req.query;
+
+    if (isNaN(userId)) return res.status(400).json({ error: "Invalid user id" });
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId }
+    });
+    
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    const current = await prisma.tileOwnership.findMany({
+      where: { userId: user.id },
+      select: { tileId: true }
+    });
+
+    let historyList = [];
+    if (history === "true") {
+      historyList = await prisma.tileHistory.findMany({
+        where: { newUser: user.id },
+        orderBy: { createdAt: "desc" },
+        take: 200,
+        select: { tileId: true, previousUser: true, createdAt: true, activityId: true }
+      });
+    }
+
+    res.json({
+      user: {
+        id: user.id,
+        firstname: user.firstname,
+        lastname: user.lastname
+      },
+      tiles: current.map(t => t.tileId),
+      history: historyList
+    });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "users/tiles failed" });
+  }
+});
+
+// GET current tiles + optional history (Legacy support for now, or just remove if fully migrating)
 app.get("/tiles/my", async (req, res) => {
   try {
     const { athleteId, history } = req.query;
@@ -462,6 +562,80 @@ app.get("/tiles/history", async (req, res) => {
     res.json(history);
   } catch (err) {
     res.status(500).json({ error: "Failed to fetch history" });
+  }
+});
+
+// GET /me/routes - Uses x-user-id header
+app.get("/me/routes", async (req, res) => {
+  try {
+    const userId = req.headers["x-user-id"];
+    
+    if (!userId) return res.status(400).json({ error: "Missing x-user-id header" });
+
+    const user = await prisma.user.findUnique({
+      where: { id: parseInt(userId) },
+      include: { 
+        activities: {
+          where: { captured: true },
+          select: {
+            id: true,
+            name: true,
+            distanceM: true,
+            polyline: true
+          }
+        }
+      }
+    });
+
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    res.json({ 
+      routes: user.activities.map(a => ({ 
+        activityId: a.id, 
+        name: a.name, 
+        polyline: a.polyline 
+      })) 
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "me/routes failed" });
+  }
+});
+
+// GET /users/:id/routes - Public profile view
+app.get("/users/:id/routes", async (req, res) => {
+  try {
+    const userId = parseInt(req.params.id);
+    
+    if (isNaN(userId)) return res.status(400).json({ error: "Invalid user id" });
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      include: { 
+        activities: {
+          where: { captured: true },
+          select: {
+            id: true,
+            name: true,
+            distanceM: true,
+            polyline: true
+          }
+        }
+      }
+    });
+
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    res.json({ 
+      routes: user.activities.map(a => ({ 
+        activityId: a.id, 
+        name: a.name, 
+        polyline: a.polyline 
+      })) 
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "users/routes failed" });
   }
 });
 
