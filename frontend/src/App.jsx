@@ -1,124 +1,122 @@
-import { useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import TerritoryMap from "./components/TerritoryMap";
 import Leaderboard from "./components/Leaderboard";
 
 export default function App() {
-  const [tiles, setTiles] = useState([]);
-  const [routes, setRoutes] = useState([]);
+  const [currentTiles, setCurrentTiles] = useState([]);
+  const [historyTiles, setHistoryTiles] = useState([]); // array of tileIds (historical captures)
+  const [routes, setRoutes] = useState([]); // array of decoded polylines or geojson lines
   const [loading, setLoading] = useState(false);
+  const [isMapReady, setIsMapReady] = useState(false);
 
-  async function loadMyTiles() {
-    const athleteId = prompt("Enter your Strava athleteId:");
+  // Provide a ref to allow child map component to notify readiness
+  const mapReadyRef = useRef({ setIsMapReady });
+
+  // Called by TerritoryMap when map 'load' fired
+  function handleMapReady() {
+    setIsMapReady(true);
+  }
+
+  // main loader for a user (by athleteId)
+  async function loadUserTerritory(athleteId) {
     if (!athleteId) return;
 
     setLoading(true);
+    setCurrentTiles([]);
+    setHistoryTiles([]);
+    setRoutes([]);
+
     try {
-      // Fetch both in parallel for speed and consistency
-      const [tilesRes, routesRes] = await Promise.all([
-        fetch(`http://localhost:4000/tiles/my?athleteId=${athleteId}`),
-        fetch(`http://localhost:4000/routes/my?athleteId=${athleteId}`),
+      // fetch tiles (including history) and routes in parallel
+      const tilesPromise = fetch(
+        `http://localhost:4000/tiles/my?athleteId=${athleteId}&history=true`
+      ).then((r) => r.json());
+
+      // assume you have an endpoint that returns saved polylines for this user
+      const routesPromise = fetch(
+        `http://localhost:4000/routes/my?athleteId=${athleteId}`
+      ).then((r) => r.json());
+
+      const [tilesResp, routesResp] = await Promise.all([
+        tilesPromise,
+        routesPromise,
       ]);
 
-      if (!tilesRes.ok || !routesRes.ok) throw new Error("Server error");
+      // tilesResp: { tiles: [...], history: [{tileId, createdAt, previousUser, activityId}] }
+      setCurrentTiles(tilesResp.tiles || []);
 
-      const [tilesData, routesData] = await Promise.all([
-        tilesRes.json(),
-        routesRes.json(),
-      ]);
+      // history tiles: we map to tileId array (you could keep full objects)
+      setHistoryTiles((tilesResp.history || []).map((h) => h.tileId));
 
-      setTiles(tilesData.tiles || []);
-      setRoutes(routesData.routes || []);
+      // routesResp expected to contain encoded polylines or geojson lines.
+      // Convert if necessary on client. Example: routesResp.routes = [{polyline: '...'}, ...]
+      setRoutes(routesResp.routes || []);
 
-      console.log("✅ Sync Complete:", {
-        tiles: tilesData.tiles?.length,
-        routes: routesData.routes?.length,
-      });
+      // if the map is ready, TerritoryMap will redraw automatically via props
+      // if not ready, when mapReady is set true, the map will draw using updated props
     } catch (err) {
-      console.error("❌ Load error:", err);
-      alert("Failed to load data. Is the backend running?");
+      console.error("Failed loading territory", err);
+      alert("Failed to load territory. See console.");
     } finally {
       setLoading(false);
     }
   }
 
+  // expose a helper so leaderboard list can call loadUserTerritory by athleteId
+  // you might pass loadUserTerritory to Leaderboard component as prop
   return (
-    <div className="min-h-screen bg-gray-50 p-4 md:p-8 font-sans">
+    <div className="min-h-screen bg-gray-100 p-4">
       <div className="max-w-6xl mx-auto">
-        <header className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 mb-10">
+        <div className="flex items-start justify-between gap-3 mb-6">
           <div>
-            <h1 className="text-4xl font-extrabold text-gray-900 tracking-tight">
-              Ruwalk
-            </h1>
-            <p className="text-gray-500 mt-1 text-lg">
-              Conquer your city, one run at a time.
-            </p>
+            <h1 className="text-3xl font-bold font-sans">Ruwalk</h1>
+            <p className="text-gray-600">Post-run territory capture</p>
           </div>
 
-          <button
-            onClick={loadMyTiles}
-            disabled={loading}
-            className={`px-8 py-4 rounded-2xl font-bold text-white transition-all transform hover:scale-105 active:scale-95 shadow-xl ${
-              loading
-                ? "bg-gray-400 cursor-not-allowed"
-                : "bg-black hover:bg-gray-800"
-            }`}
-          >
-            {loading ? (
-              <span className="flex items-center gap-2">
-                <svg
-                  className="animate-spin h-5 w-5 text-white"
-                  viewBox="0 0 24 24"
-                >
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                    fill="none"
-                  />
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                  />
-                </svg>
-                Syncing...
+          <div className="flex items-center gap-3">
+            <input
+              id="athleteIdInput"
+              placeholder="Enter athleteId"
+              className="px-4 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+            />
+            <button
+              onClick={() => {
+                const id = document
+                  .getElementById("athleteIdInput")
+                  .value.trim();
+                loadUserTerritory(id);
+              }}
+              className="px-6 py-2 rounded-xl bg-black text-white font-bold hover:bg-gray-800 transition-colors"
+            >
+              {loading ? "Loading..." : "Load Territory"}
+            </button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2">
+            <TerritoryMap
+              currentTiles={currentTiles}
+              historyTiles={historyTiles}
+              routes={routes}
+              onMapReady={handleMapReady}
+            />
+            <div className="mt-4 flex gap-4 text-sm font-medium">
+              <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full">
+                Current: <b>{currentTiles.length}</b>
               </span>
-            ) : (
-              "Capture Recent Activity"
-            )}
-          </button>
-        </header>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-2 space-y-6">
-            <TerritoryMap tiles={tiles} routes={routes} />
-
-            <div className="flex gap-4">
-              <div className="flex-1 bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
-                <p className="text-gray-400 text-sm font-bold uppercase tracking-wider">
-                  Tiles Owned
-                </p>
-                <p className="text-3xl font-black text-blue-600">
-                  {tiles.length}
-                </p>
-              </div>
-              <div className="flex-1 bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
-                <p className="text-gray-400 text-sm font-bold uppercase tracking-wider">
-                  Activities
-                </p>
-                <p className="text-3xl font-black text-red-500">
-                  {routes.length}
-                </p>
-              </div>
+              <span className="px-3 py-1 bg-gray-200 text-gray-600 rounded-full">
+                Historical: <b>{historyTiles.length}</b>
+              </span>
             </div>
           </div>
 
-          <aside>
-            <Leaderboard />
-          </aside>
+          <div>
+            {/* pass loadUserTerritory into leaderboard so clicking a row loads that user */}
+            <Leaderboard
+              onSelectUser={(athleteId) => loadUserTerritory(athleteId)}
+            />
+          </div>
         </div>
       </div>
     </div>

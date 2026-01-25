@@ -18,6 +18,8 @@ model User {
 
   activities      Activity[]
   tiles           TileOwnership[]
+  historyCaptured TileHistory[] @relation("TileHistoryNewUser")
+  historyLost     TileHistory[] @relation("TileHistoryPrevUser")
 }
 
 model Activity {
@@ -47,4 +49,19 @@ model TileOwnership {
   user      User     @relation(fields: [userId], references: [id])
 
   @@unique([tileId]) // only one owner per tile
+}
+
+model TileHistory {
+  id           Int      @id @default(autoincrement())
+  tileId       String
+  previousUser Int?     // nullable, who lost the tile if any
+  newUser      Int      // who captured the tile
+  activityId   Int?     // optional: which activity caused capture
+  createdAt    DateTime @default(now())
+
+  // optional relations
+  userNew      User?    @relation("TileHistoryNewUser", fields: [newUser], references: [id])
+  userPrev     User?    @relation("TileHistoryPrevUser", fields: [previousUser], references: [id])
+
+  @@index([tileId])
 }

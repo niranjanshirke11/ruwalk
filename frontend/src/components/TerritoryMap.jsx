@@ -4,18 +4,25 @@ import { cellToBoundary } from "h3-js";
 import polyline from "@mapbox/polyline";
 import "maplibre-gl/dist/maplibre-gl.css";
 
-export default function TerritoryMap({ tiles = [], routes = [] }) {
+export default function TerritoryMap({
+  currentTiles = [],
+  historyTiles = [],
+  routes = [],
+  onMapReady = () => {},
+}) {
   const mapRef = useRef(null);
-  const mapContainerRef = useRef(null);
+  const containerRef = useRef(null);
   const [isMapReady, setIsMapReady] = useState(false);
 
-  // 1. Initialize Map
   useEffect(() => {
     const key = import.meta.env.VITE_MAPTILER_KEY;
-    if (!key) return;
+    if (!key) {
+      alert("Missing VITE_MAPTILER_KEY");
+      return;
+    }
 
     const map = new maplibregl.Map({
-      container: mapContainerRef.current,
+      container: containerRef.current,
       style: `https://api.maptiler.com/maps/streets/style.json?key=${key}`,
       center: [73.8567, 18.5204],
       zoom: 11,
@@ -24,142 +31,194 @@ export default function TerritoryMap({ tiles = [], routes = [] }) {
     map.addControl(new maplibregl.NavigationControl(), "top-right");
 
     map.on("load", () => {
-      console.log("🗺️ Map Ready Signal Received");
+      console.log("🗺️ Map Initialization Complete");
       mapRef.current = map;
-      setIsMapReady(true); // This triggers the data rendering effect
+      setIsMapReady(true);
+      onMapReady();
     });
 
-    return () => map.remove();
+    return () => {
+      map.remove();
+      mapRef.current = null;
+    };
   }, []);
 
-  // 2. Responsive Data Painter
+  // Utility: convert H3 tileId -> polygon coordinates
+  function h3TilesToGeoJSON(tileIds) {
+    const features = tileIds.map((tileId) => {
+      const boundary = cellToBoundary(tileId, true); // [lng,lat]
+      boundary.push(boundary[0]); // close polygon
+      return {
+        type: "Feature",
+        properties: { tileId },
+        geometry: { type: "Polygon", coordinates: [boundary] },
+      };
+    });
+
+    return { type: "FeatureCollection", features };
+  }
+
+  // Reactive Map Painting
   useEffect(() => {
-    // Only run if map is ready AND we have a ref
-    if (!isMapReady || !mapRef.current) return;
-
     const map = mapRef.current;
+    if (!map || !isMapReady) return;
 
-    console.log("🎨 Triggering Map Paint", {
-      tiles: tiles.length,
+    console.log("🎨 Painting Map Layers...", {
+      current: currentTiles.length,
+      history: historyTiles.length,
       routes: routes.length,
     });
 
-    // --- TILES ---
-    if (map.getSource("tiles-source")) {
-      map.removeLayer("tiles-fill");
-      map.removeLayer("tiles-border");
-      map.removeSource("tiles-source");
-    }
+    // --- 1. CLEANUP OLD LAYERS ---
+    const layersToCleanup = [
+      "history-fill",
+      "history-border",
+      "current-fill",
+      "current-border",
+      "route-glow",
+      "route-core",
+    ];
+    const sourcesToCleanup = [
+      "history-source",
+      "current-source",
+      "route-source",
+    ];
 
-    if (tiles.length > 0) {
-      const tileFeatures = tiles.map((id) => ({
-        type: "Feature",
-        geometry: {
-          type: "Polygon",
-          coordinates: [
-            cellToBoundary(id, true).concat([cellToBoundary(id, true)[0]]),
-          ],
-        },
-      }));
+    layersToCleanup.forEach((l) => {
+      if (map.getLayer(l)) map.removeLayer(l);
+    });
+    sourcesToCleanup.forEach((s) => {
+      if (map.getSource(s)) map.removeSource(s);
+    });
 
-      map.addSource("tiles-source", {
-        type: "geojson",
-        data: { type: "FeatureCollection", features: tileFeatures },
-      });
+    const bounds = new maplibregl.LngLatBounds();
+    let hasData = false;
+
+    // --- 2. DRAW HISTORY TILES (FADED GRAY) ---
+    if (historyTiles?.length) {
+      const historyGeo = h3TilesToGeoJSON(historyTiles);
+      map.addSource("history-source", { type: "geojson", data: historyGeo });
+
       map.addLayer({
-        id: "tiles-fill",
+        id: "history-fill",
         type: "fill",
-        source: "tiles-source",
-        paint: { "fill-color": "#3b82f6", "fill-opacity": 0.25 },
+        source: "history-source",
+        paint: { "fill-color": "#9CA3AF", "fill-opacity": 0.15 },
       });
+
       map.addLayer({
-        id: "tiles-border",
+        id: "history-border",
         type: "line",
-        source: "tiles-source",
-        paint: { "line-color": "#2563eb", "line-width": 1.5 },
+        source: "history-source",
+        paint: {
+          "line-width": 1,
+          "line-color": "#6B7280",
+          "line-opacity": 0.4,
+        },
       });
+
+      historyGeo.features.forEach((f) =>
+        f.geometry.coordinates[0].forEach((c) => {
+          bounds.extend(c);
+          hasData = true;
+        })
+      );
     }
 
-    // --- ROUTES ---
-    if (map.getSource("routes-source")) {
-      map.removeLayer("routes-outer");
-      map.removeLayer("routes-inner");
-      map.removeSource("routes-source");
+    // --- 3. DRAW CURRENT TILES (DARK/PROMINENT) ---
+    if (currentTiles?.length) {
+      const currentGeo = h3TilesToGeoJSON(currentTiles);
+      map.addSource("current-source", { type: "geojson", data: currentGeo });
+
+      map.addLayer({
+        id: "current-fill",
+        type: "fill",
+        source: "current-source",
+        paint: { "fill-color": "#111827", "fill-opacity": 0.4 },
+      });
+
+      map.addLayer({
+        id: "current-border",
+        type: "line",
+        source: "current-source",
+        paint: {
+          "line-width": 2,
+          "line-color": "#000000",
+          "line-opacity": 0.7,
+        },
+      });
+
+      currentGeo.features.forEach((f) =>
+        f.geometry.coordinates[0].forEach((c) => {
+          bounds.extend(c);
+          hasData = true;
+        })
+      );
     }
 
-    if (routes.length > 0) {
-      const routeFeatures = routes
-        .filter((r) => r.polyline)
-        .map((r) => {
-          const coords = polyline
-            .decode(r.polyline)
-            .map(([lat, lng]) => [lng, lat]);
-          return {
-            type: "Feature",
-            geometry: { type: "LineString", coordinates: coords },
-          };
+    // --- 4. DRAW ROUTES (GLOW PATH) ---
+    const routeFeatures = [];
+    for (const r of routes || []) {
+      if (r.polyline) {
+        const decoded = polyline
+          .decode(r.polyline)
+          .map(([lat, lng]) => [lng, lat]);
+        routeFeatures.push({
+          type: "Feature",
+          geometry: { type: "LineString", coordinates: decoded },
         });
-
-      if (routeFeatures.length > 0) {
-        map.addSource("routes-source", {
-          type: "geojson",
-          data: { type: "FeatureCollection", features: routeFeatures },
-        });
-
-        map.addLayer({
-          id: "routes-outer",
-          type: "line",
-          source: "routes-source",
-          paint: {
-            "line-color": "#ffffff",
-            "line-width": 6,
-            "line-opacity": 0.8,
-          },
-        });
-
-        map.addLayer({
-          id: "routes-inner",
-          type: "line",
-          source: "routes-source",
-          layout: { "line-join": "round", "line-cap": "round" },
-          paint: {
-            "line-color": "#ef4444",
-            "line-width": 3,
-            "line-opacity": 1.0,
-          },
-        });
-
-        // Smart Zoom
-        const bounds = new maplibregl.LngLatBounds();
-        routeFeatures.forEach((f) =>
-          f.geometry.coordinates.forEach((c) => bounds.extend(c))
-        );
-        map.fitBounds(bounds, { padding: 100, duration: 1500 });
       }
     }
-  }, [isMapReady, tiles, routes]); // Listens to both map readiness and data changes
+
+    if (routeFeatures.length > 0) {
+      map.addSource("route-source", {
+        type: "geojson",
+        data: { type: "FeatureCollection", features: routeFeatures },
+      });
+
+      map.addLayer({
+        id: "route-glow",
+        type: "line",
+        source: "route-source",
+        paint: {
+          "line-color": "#ffffff",
+          "line-width": 8,
+          "line-opacity": 0.9,
+        },
+      });
+
+      map.addLayer({
+        id: "route-core",
+        type: "line",
+        source: "route-source",
+        layout: { "line-join": "round", "line-cap": "round" },
+        paint: { "line-color": "#ef4444", "line-width": 3 },
+      });
+
+      routeFeatures.forEach((f) =>
+        f.geometry.coordinates.forEach((c) => {
+          bounds.extend(c);
+          hasData = true;
+        })
+      );
+    }
+
+    // --- 5. SMART ZOOM ---
+    if (hasData) {
+      map.fitBounds(bounds, { padding: 80, duration: 2000, maxZoom: 15 });
+    }
+  }, [isMapReady, currentTiles, historyTiles, routes]);
 
   return (
-    <div className="relative w-full h-[500px] rounded-[2.5rem] overflow-hidden shadow-2xl border-8 border-white bg-gray-100 group">
-      <div ref={mapContainerRef} className="w-full h-full" />
+    <div className="relative w-full h-[520px] rounded-[2.5rem] overflow-hidden shadow-2xl border-8 border-white bg-gray-100 group">
+      <div ref={containerRef} className="w-full h-full" />
 
       {!isMapReady && (
-        <div className="absolute inset-0 bg-gray-100 flex items-center justify-center">
+        <div className="absolute inset-0 bg-gray-50 flex items-center justify-center">
           <div className="flex flex-col items-center gap-4">
-            <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
-            <p className="text-gray-500 font-medium">
-              Loading Map Satellites...
-            </p>
-          </div>
-        </div>
-      )}
-
-      {isMapReady && tiles.length === 0 && (
-        <div className="absolute top-6 left-1/2 -translate-x-1/2 pointer-events-none transition-all group-hover:top-8">
-          <div className="px-6 py-3 bg-white/90 backdrop-blur-md rounded-2xl shadow-xl border border-white/50">
-            <p className="text-gray-800 text-sm font-bold flex items-center gap-2">
-              <span className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
-              Ready for Capture
+            <div className="w-12 h-12 border-[5px] border-black border-t-transparent rounded-full animate-spin" />
+            <p className="text-black font-bold tracking-tighter text-lg">
+              LOADING SATELLITE...
             </p>
           </div>
         </div>

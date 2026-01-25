@@ -214,6 +214,7 @@ app.get("/strava/sync-latest", async (req, res) => {
     const distanceM = distanceKm * 1000;
     const isClosedRun = distanceM <= 200;
 
+    const RESOLUTION = 10;
     let capturedTiles = [];
 
     if (isClosedRun) {
@@ -226,10 +227,7 @@ app.get("/strava/sync-latest", async (req, res) => {
       // decode polyline -> array of [lat, lng]
       const points = polyline.decode(encoded);
 
-      // Choose tile resolution:
-      // 7 = city-level (good MVP)
-      // 8 = more detailed
-      const RESOLUTION = 7;
+
 
       const tileSet = new Set();
 
@@ -270,17 +268,49 @@ app.get("/strava/sync-latest", async (req, res) => {
       }
     });
 
-    // 6) Save ownership:
+    // 6) Save ownership & Record History:
     if (isClosedRun && capturedTiles.length > 0) {
       for (const tileId of capturedTiles) {
-        await prisma.tileOwnership.upsert({
+        // check current owner
+        const existing = await prisma.tileOwnership.findUnique({
           where: { tileId },
-          update: { userId: user.id },   // 👈 overwrite owner
-          create: {
-            tileId,
-            userId: user.id
-          }
+          select: { id: true, userId: true }
         });
+
+        if (existing) {
+          if (existing.userId !== user.id) {
+            // owner changed -> update owner and add history about the change
+            await prisma.tileOwnership.update({
+              where: { id: existing.id },
+              data: { userId: user.id }
+            });
+
+            // record history of ownership change
+            await prisma.tileHistory.create({
+              data: {
+                tileId,
+                previousUser: existing.userId,
+                newUser: user.id,
+                activityId: savedActivity.id
+              }
+            });
+          }
+          // else same owner - no change (still could record re-capture if desired)
+        } else {
+          // new tile: create ownership + history (previousUser null)
+          await prisma.tileOwnership.create({
+            data: { tileId, userId: user.id }
+          });
+
+          await prisma.tileHistory.create({
+            data: {
+              tileId,
+              previousUser: null,
+              newUser: user.id,
+              activityId: savedActivity.id
+            }
+          });
+        }
       }
     }
 
@@ -293,7 +323,7 @@ app.get("/strava/sync-latest", async (req, res) => {
         max_allowed_m: 200
       },
       tiles: {
-        resolution: 7,
+        resolution: RESOLUTION,
         captured_count: capturedTiles.length,
         sample: capturedTiles.slice(0, 10)
       },
@@ -314,6 +344,7 @@ app.get("/leaderboard", async (req, res) => {
     const users = await prisma.user.findMany({
       select: {
         id: true,
+        stravaAthleteId: true, // 👈 CRITICAL: missing this was causing 500 error
         firstname: true,
         lastname: true,
         username: true,
@@ -339,6 +370,7 @@ app.get("/leaderboard", async (req, res) => {
 
       return {
         id: u.id,
+        stravaAthleteId: u.stravaAthleteId ? u.stravaAthleteId.toString() : null,
         firstname: u.firstname,
         lastname: u.lastname,
         username: u.username,
@@ -362,28 +394,74 @@ app.get("/leaderboard", async (req, res) => {
 });
 
 
+// GET current tiles + optional history
 app.get("/tiles/my", async (req, res) => {
-  const { athleteId } = req.query;
-
-  if (!athleteId) {
-    return res.status(400).json({ error: "Missing athleteId" });
-  }
-
   try {
+    const { athleteId, history } = req.query;
+    if (!athleteId) return res.status(400).json({ error: "Missing athleteId" });
+
     const user = await prisma.user.findUnique({
-      where: { stravaAthleteId: BigInt(athleteId) },
-      include: { tiles: true }
+      where: { stravaAthleteId: BigInt(athleteId) }
+    });
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    // current tiles
+    const current = await prisma.tileOwnership.findMany({
+      where: { userId: user.id },
+      select: { tileId: true }
     });
 
-    if (!user) {
-      return res.status(404).json({ error: "User not found" });
+    // optional history -> return latest N history tile captures by this user
+    let historyList = [];
+    if (history === "true") {
+      historyList = await prisma.tileHistory.findMany({
+        where: { newUser: user.id },
+        orderBy: { createdAt: "desc" },
+        take: 200, // limit size for now
+        select: { tileId: true, previousUser: true, createdAt: true, activityId: true }
+      });
     }
 
     res.json({
-      tiles: user.tiles.map(t => t.tileId)
+      user: {
+        id: user.id,
+        firstname: user.firstname,
+        lastname: user.lastname
+      },
+      tiles: current.map(t => t.tileId),
+      history: historyList
     });
   } catch (err) {
-    res.status(500).json({ error: "Failed to fetch tiles" });
+    console.error(err);
+    res.status(500).json({ error: "tiles/my failed" });
+  }
+});
+
+app.get("/tiles/history", async (req, res) => {
+  const { athleteId } = req.query;
+  if (!athleteId) return res.status(400).json({ error: "Missing athleteId" });
+
+  try {
+    const user = await prisma.user.findUnique({ where: { stravaAthleteId: BigInt(athleteId) } });
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    const history = await prisma.tileHistory.findMany({
+      where: { 
+        OR: [
+          { newUser: user.id },
+          { previousUser: user.id }
+        ]
+      },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        userNew: { select: { firstname: true, lastname: true } },
+        userPrev: { select: { firstname: true, lastname: true } }
+      }
+    });
+
+    res.json(history);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to fetch history" });
   }
 });
 
@@ -419,8 +497,12 @@ app.get("/routes/my", async (req, res) => {
       return res.status(404).json({ error: "User not found" });
     }
 
-    res.json({
-      routes: user.activities
+    res.json({ 
+      routes: user.activities.map(a => ({ 
+        activityId: a.id, 
+        name: a.name, 
+        polyline: a.polyline 
+      })) 
     });
   } catch (err) {
     console.error(err);
@@ -461,6 +543,7 @@ app.post("/dev/reset", async (req, res) => {
   }
 
   try {
+    await prisma.tileHistory.deleteMany();
     await prisma.tileOwnership.deleteMany();
     await prisma.activity.deleteMany();
     await prisma.user.deleteMany();
@@ -510,7 +593,7 @@ app.post("/dev/seed", async (req, res) => {
 
     // 2) Seed tiles around Pune (H3 resolution 7)
     // Pune center: 18.5204, 73.8567
-    const RES = 7;
+    const RES = 10;
     const baseLat = 18.5204;
     const baseLng = 73.8567;
 
@@ -583,7 +666,7 @@ app.post("/dev/seed-routes", async (req, res) => {
   }
 
   try {
-    const RES = 7;
+    const RES = 10;
 
     // Pune center
     const baseLat = 18.5204;
@@ -647,7 +730,7 @@ app.post("/dev/seed-routes", async (req, res) => {
           lng: start.lng + (Math.random() - 0.5) * 0.002
         };
 
-        const points = generateRoutePoints(start, end, 90, 0.0012);
+        const points = generateRoutePoints(start, end, 200, 0.00015);
 
         const tileSet = new Set();
 
@@ -658,13 +741,46 @@ app.post("/dev/seed-routes", async (req, res) => {
 
         const tileIds = [...tileSet];
 
-        // Store tiles (ownership overwrite to allow stealing)
+        // Store tiles & Record History
         for (const tileId of tileIds) {
-          await prisma.tileOwnership.upsert({
-            where: { tileId },
-            update: { userId: user.id },
-            create: { tileId, userId: user.id }
-          });
+          try {
+            const existing = await prisma.tileOwnership.findUnique({
+              where: { tileId },
+              select: { id: true, userId: true }
+            });
+
+            if (existing) {
+              if (existing.userId !== user.id) {
+                await prisma.tileOwnership.update({
+                  where: { id: existing.id },
+                  data: { userId: user.id }
+                });
+
+                await prisma.tileHistory.create({
+                  data: {
+                    tileId,
+                    previousUser: existing.userId,
+                    newUser: user.id
+                  }
+                });
+              }
+            } else {
+              await prisma.tileOwnership.create({
+                data: { tileId, userId: user.id }
+              });
+
+              await prisma.tileHistory.create({
+                data: {
+                  tileId,
+                  previousUser: null,
+                  newUser: user.id
+                }
+              });
+            }
+          } catch (tileErr) {
+            console.error(`[ERROR] Failed processing tile ${tileId}:`, tileErr);
+            // continue to next tile
+          }
         }
 
         // distance estimate (fake): based on tile count
@@ -704,8 +820,12 @@ app.post("/dev/seed-routes", async (req, res) => {
       resolution: RES
     });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Seed routes failed" });
+    console.error("[ERROR] Seed Routes Failed:", err);
+    res.status(500).json({ 
+      error: "Seed routes failed",
+      message: err.message,
+      stack: err.stack 
+    });
   }
 });
 
