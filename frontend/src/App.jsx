@@ -62,15 +62,17 @@ export default function App() {
       let tilesUrl, routesUrl;
       const headers = {};
 
+      const API_URL = import.meta.env.VITE_API_URL || "http://localhost:4000";
+
       if (target === "me") {
         if (!currentUser) return;
-        tilesUrl = `http://localhost:4000/me/tiles?history=true`;
-        routesUrl = `http://localhost:4000/me/routes`;
+        tilesUrl = `${API_URL}/me/tiles?history=true`;
+        routesUrl = `${API_URL}/me/routes`;
         headers["x-user-id"] = currentUser.id;
       } else {
         // Public view
-        tilesUrl = `http://localhost:4000/users/${target}/tiles?history=true`;
-        routesUrl = `http://localhost:4000/users/${target}/routes`;
+        tilesUrl = `${API_URL}/users/${target}/tiles?history=true`;
+        routesUrl = `${API_URL}/users/${target}/routes`;
       }
 
       const [tilesResp, routesResp] = await Promise.all([
@@ -145,7 +147,7 @@ export default function App() {
               </div>
             ) : (
               <a
-                href="http://localhost:4000/strava/login"
+                href={`${import.meta.env.VITE_API_URL || "http://localhost:4000"}/strava/login`}
                 className="flex items-center gap-2 px-6 py-3 bg-[#FC4C02] text-white font-bold rounded-xl hover:bg-[#e34402] transition-colors shadow-lg shadow-orange-500/20"
               >
                 Connect Strava

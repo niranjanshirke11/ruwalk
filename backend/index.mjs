@@ -97,6 +97,16 @@ app.get("/strava/callback", async (req, res) => {
     });
     console.log("[DEBUG] Database sync complete.");
 
+    // --- AUTO SYNC LATEST ACTIVITY ---
+    try {
+      console.log("[DEBUG] Auto-syncing latest activity...");
+      await syncStravaActivity(tokens.access_token, user);
+      console.log("[DEBUG] Auto-sync complete.");
+    } catch (syncErr) {
+      console.error("[WARN] Auto-sync filed during callback:", syncErr.message);
+      // Don't fail the login if sync fails, just log it
+    }
+
     const userData = {
       id: user.id.toString(),
       firstname: user.firstname,
@@ -107,8 +117,8 @@ app.get("/strava/callback", async (req, res) => {
 
     // Redirect to frontend with user data
     // In a real app, you'd use a secure cookie or a token. 
-    // For MVP, we'll pass the user object in the URL.
-    const redirectUrl = `http://localhost:5173/?user=${encodeURIComponent(JSON.stringify(userData))}&token=${tokens.access_token}`;
+    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173"; 
+    const redirectUrl = `${frontendUrl}/?user=${encodeURIComponent(JSON.stringify(userData))}&token=${tokens.access_token}`;
     res.redirect(redirectUrl);
 
   } catch (error) {
@@ -190,152 +200,18 @@ app.get("/strava/sync-latest", async (req, res) => {
       }
     });
 
-    // 3) Fetch latest activity
-    const activitiesRes = await axios.get(
-      "https://www.strava.com/api/v3/athlete/activities",
-      {
-        headers: { Authorization: `Bearer ${accessToken}` },
-        params: { per_page: 1 }
-      }
-    );
+    // 3) Sync Activity via Helper
+    const result = await syncStravaActivity(accessToken, user);
 
-    const act = activitiesRes.data[0];
-
-    if (!act) {
-      return res.status(404).json({ error: "No activities found" });
+    if (result.error) {
+      return res.status(404).json({ error: result.error });
     }
-
-    // 4) Calculate capture status (start/end distance <= 200m)
-    const start = act.start_latlng;
-    const end = act.end_latlng;
-
-    if (!start || !end) {
-      return res.status(400).json({
-        error: "Activity missing start or end coordinates"
-      });
-    }
-
-    const startPoint = turf.point([start[1], start[0]]); // [lng, lat]
-    const endPoint = turf.point([end[1], end[0]]);
-
-    const distanceKm = turf.distance(startPoint, endPoint, { units: "kilometers" });
-    const distanceM = distanceKm * 1000;
-    const isClosedRun = distanceM <= 200;
-
-    const RESOLUTION = 10;
-    let capturedTiles = [];
-
-    if (isClosedRun) {
-      const encoded = act.map?.summary_polyline;
-
-      if (!encoded) {
-        return res.status(400).json({ error: "No polyline found in activity" });
-      }
-
-      // decode polyline -> array of [lat, lng]
-      const points = polyline.decode(encoded);
-
-
-
-      const tileSet = new Set();
-
-      for (const [lat, lng] of points) {
-        const tileId = latLngToCell(lat, lng, RESOLUTION);
-        tileSet.add(tileId);
-      }
-
-      capturedTiles = [...tileSet];
-    }
-
-    // 5) Save activity (avoid duplicates using unique stravaId)
-    const savedActivity = await prisma.activity.upsert({
-      where: { stravaId: BigInt(act.id) },
-      update: {
-        name: act.name,
-        distanceM: act.distance,
-        movingTimeS: act.moving_time,
-        startLat: act.start_latlng?.[0] ?? null,
-        startLng: act.start_latlng?.[1] ?? null,
-        endLat: act.end_latlng?.[0] ?? null,
-        endLng: act.end_latlng?.[1] ?? null,
-        polyline: act.map?.summary_polyline ?? null,
-        captured: isClosedRun
-      },
-      create: {
-        stravaId: BigInt(act.id),
-        userId: user.id,
-        name: act.name,
-        distanceM: act.distance,
-        movingTimeS: act.moving_time,
-        startLat: act.start_latlng?.[0] ?? null,
-        startLng: act.start_latlng?.[1] ?? null,
-        endLat: act.end_latlng?.[0] ?? null,
-        endLng: act.end_latlng?.[1] ?? null,
-        polyline: act.map?.summary_polyline ?? null,
-        captured: isClosedRun
-      }
-    });
-
-    // 6) Save ownership & Record History:
-    if (isClosedRun && capturedTiles.length > 0) {
-      for (const tileId of capturedTiles) {
-        // check current owner
-        const existing = await prisma.tileOwnership.findUnique({
-          where: { tileId },
-          select: { id: true, userId: true }
-        });
-
-        if (existing) {
-          if (existing.userId !== user.id) {
-            // owner changed -> update owner and add history about the change
-            await prisma.tileOwnership.update({
-              where: { id: existing.id },
-              data: { userId: user.id }
-            });
-
-            // record history of ownership change
-            await prisma.tileHistory.create({
-              data: {
-                tileId,
-                previousUser: existing.userId,
-                newUser: user.id,
-                activityId: savedActivity.id
-              }
-            });
-          }
-          // else same owner - no change (still could record re-capture if desired)
-        } else {
-          // new tile: create ownership + history (previousUser null)
-          await prisma.tileOwnership.create({
-            data: { tileId, userId: user.id }
-          });
-
-          await prisma.tileHistory.create({
-            data: {
-              tileId,
-              previousUser: null,
-              newUser: user.id,
-              activityId: savedActivity.id
-            }
-          });
-        }
-      }
-    }
-
 
     res.json({
       message: "Latest activity synced successfully",
-      rule: {
-        distance_start_end_m: Math.round(distanceM),
-        captured: isClosedRun,
-        max_allowed_m: 200
-      },
-      tiles: {
-        resolution: RESOLUTION,
-        captured_count: capturedTiles.length,
-        sample: capturedTiles.slice(0, 10)
-      },
-      activity: savedActivity
+      rule: result.rule,
+      tiles: result.tiles,
+      activity: result.activity
     });
   } catch (err) {
     const errorData = err.response?.data || err.message;
@@ -346,7 +222,6 @@ app.get("/strava/sync-latest", async (req, res) => {
     });
   }
 });
-
 app.get("/leaderboard", async (req, res) => {
   try {
     const users = await prisma.user.findMany({
@@ -576,7 +451,7 @@ app.get("/me/routes", async (req, res) => {
       where: { id: parseInt(userId) },
       include: { 
         activities: {
-          where: { captured: true },
+          orderBy: { createdAt: 'desc' },
           select: {
             id: true,
             name: true,
@@ -613,7 +488,7 @@ app.get("/users/:id/routes", async (req, res) => {
       where: { id: userId },
       include: { 
         activities: {
-          where: { captured: true },
+          orderBy: { createdAt: 'desc' },
           select: {
             id: true,
             name: true,
@@ -651,7 +526,7 @@ app.get("/routes/my", async (req, res) => {
       where: { stravaAthleteId: BigInt(athleteId) },
       include: { 
         activities: {
-          where: { captured: true },
+          orderBy: { createdAt: 'desc' },
           select: {
             id: true,
             name: true,
@@ -706,6 +581,149 @@ function generateRoutePoints(start, end, pointsCount = 80, wiggle = 0.0015) {
     pts.push({ lat, lng });
   }
   return pts;
+}
+
+// ========== SHARED SYNC HELPER ==========
+async function syncStravaActivity(accessToken, user) {
+  // 3) Fetch latest activity
+  const activitiesRes = await axios.get(
+    "https://www.strava.com/api/v3/athlete/activities",
+    {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      params: { per_page: 1 }
+    }
+  );
+
+  const act = activitiesRes.data[0];
+
+  if (!act) {
+    return { error: "No activities found" };
+  }
+
+  // 4) Calculate capture status (start/end distance <= 200m)
+  const start = act.start_latlng;
+  const end = act.end_latlng;
+
+  // We need start/end to calculate closure. 
+  // If undefined, we can't capture, but we should still save it? 
+  // For now return error if missing coords as per original logic
+  if (!start || !end) {
+    return { error: "Activity missing start or end coordinates" };
+  }
+
+  const startPoint = turf.point([start[1], start[0]]); // [lng, lat]
+  const endPoint = turf.point([end[1], end[0]]);
+
+  const distanceKm = turf.distance(startPoint, endPoint, { units: "kilometers" });
+  const distanceM = distanceKm * 1000;
+  const isClosedRun = distanceM <= 200;
+
+  const RESOLUTION = 10;
+  let capturedTiles = [];
+
+  if (isClosedRun) {
+    const encoded = act.map?.summary_polyline;
+
+    if (encoded) {
+      // decode polyline -> array of [lat, lng]
+      const points = polyline.decode(encoded);
+
+      const tileSet = new Set();
+      for (const [lat, lng] of points) {
+        const tileId = latLngToCell(lat, lng, RESOLUTION);
+        tileSet.add(tileId);
+      }
+      capturedTiles = [...tileSet];
+    }
+  }
+
+  // 5) Save activity (avoid duplicates using unique stravaId)
+  const savedActivity = await prisma.activity.upsert({
+    where: { stravaId: BigInt(act.id) },
+    update: {
+      name: act.name,
+      distanceM: act.distance,
+      movingTimeS: act.moving_time,
+      startLat: act.start_latlng?.[0] ?? null,
+      startLng: act.start_latlng?.[1] ?? null,
+      endLat: act.end_latlng?.[0] ?? null,
+      endLng: act.end_latlng?.[1] ?? null,
+      polyline: act.map?.summary_polyline ?? null,
+      captured: isClosedRun
+    },
+    create: {
+      stravaId: BigInt(act.id),
+      userId: user.id,
+      name: act.name,
+      distanceM: act.distance,
+      movingTimeS: act.moving_time,
+      startLat: act.start_latlng?.[0] ?? null,
+      startLng: act.start_latlng?.[1] ?? null,
+      endLat: act.end_latlng?.[0] ?? null,
+      endLng: act.end_latlng?.[1] ?? null,
+      polyline: act.map?.summary_polyline ?? null,
+      captured: isClosedRun
+    }
+  });
+
+  // 6) Save ownership & Record History:
+  if (isClosedRun && capturedTiles.length > 0) {
+    for (const tileId of capturedTiles) {
+      // check current owner
+      const existing = await prisma.tileOwnership.findUnique({
+        where: { tileId },
+        select: { id: true, userId: true }
+      });
+
+      if (existing) {
+        if (existing.userId !== user.id) {
+          // owner changed -> update owner and add history about the change
+          await prisma.tileOwnership.update({
+            where: { id: existing.id },
+            data: { userId: user.id }
+          });
+
+          // record history of ownership change
+          await prisma.tileHistory.create({
+            data: {
+              tileId,
+              previousUser: existing.userId,
+              newUser: user.id,
+              activityId: savedActivity.id
+            }
+          });
+        }
+      } else {
+        // new tile: create ownership + history (previousUser null)
+        await prisma.tileOwnership.create({
+          data: { tileId, userId: user.id }
+        });
+
+        await prisma.tileHistory.create({
+          data: {
+            tileId,
+            previousUser: null,
+            newUser: user.id,
+            activityId: savedActivity.id
+          }
+        });
+      }
+    }
+  }
+
+  return {
+    rule: {
+      distance_start_end_m: Math.round(distanceM),
+      captured: isClosedRun,
+      max_allowed_m: 200
+    },
+    tiles: {
+      resolution: RESOLUTION,
+      captured_count: capturedTiles.length,
+      sample: capturedTiles.slice(0, 10)
+    },
+    activity: savedActivity
+  };
 }
 
 // ========== DEV ROUTES ==========

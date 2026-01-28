@@ -7,7 +7,8 @@ export default function Leaderboard({ onSelectUser }) {
   async function fetchLeaderboard() {
     setLoading(true);
     try {
-      const res = await fetch("http://localhost:4000/leaderboard");
+      const API_URL = import.meta.env.VITE_API_URL || "http://localhost:4000";
+      const res = await fetch(`${API_URL}/leaderboard`);
       const json = await res.json();
       setData(Array.isArray(json) ? json : []);
     } catch (err) {
