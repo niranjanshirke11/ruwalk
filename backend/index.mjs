@@ -2,7 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from "dotenv";
 import axios from "axios";
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient } from "./prisma/generated/client/index.js";
 import { PrismaPg } from "@prisma/adapter-pg";
 import pgPkg from "pg";
 import * as turf from "@turf/turf";
