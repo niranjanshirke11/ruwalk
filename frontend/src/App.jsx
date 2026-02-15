@@ -136,13 +136,16 @@ export default function App() {
     <div className="min-h-screen bg-gray-100 p-4 font-sans">
       <div className="max-w-6xl mx-auto">
         <div className="flex items-center justify-between mb-8 bg-white p-4 rounded-3xl shadow-sm border border-gray-100">
-          <div>
-            <h1 className="text-3xl font-black tracking-tight text-gray-900">
-              Ruwalk
-            </h1>
-            <p className="text-gray-500 font-medium">
-              Capture the world, one run at a time.
-            </p>
+          <div className="flex items-center gap-4">
+            <img src="/favicon.png" alt="Ruwalk Logo" className="w-12 h-12 rounded-xl shadow-sm" />
+            <div>
+              <h1 className="text-3xl font-black tracking-tight text-gray-900">
+                Ruwalk
+              </h1>
+              <p className="text-gray-500 font-medium">
+                Capture the world, one run at a time.
+              </p>
+            </div>
           </div>
 
           <div>
