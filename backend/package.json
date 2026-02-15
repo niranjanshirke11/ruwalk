@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "start": "node index.mjs",
-    "build": "prisma generate",
+    "build": "prisma generate && prisma generate --generator client",
     "postinstall": "prisma generate"
   },
   "keywords": [],
