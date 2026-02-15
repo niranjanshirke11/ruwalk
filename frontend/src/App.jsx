@@ -100,6 +100,13 @@ export default function App() {
     try {
       const API_URL = import.meta.env.VITE_API_URL || "http://localhost:4000";
       const resp = await fetch(`${API_URL}/strava/sync-latest?token=${token}`);
+
+      if (!resp.ok) {
+        const errorText = await resp.text();
+        console.error("Sync server error:", errorText);
+        return alert(`Server Error (${resp.status}): The sync took too long or failed. Check Vercel logs.`);
+      }
+
       const data = await resp.json();
 
       if (data.error) {
@@ -109,8 +116,8 @@ export default function App() {
         loadTerritory("me"); // Refresh map
       }
     } catch (err) {
-      console.error("Sync failed", err);
-      alert("Failed to sync activity.");
+      console.error("Sync request failed", err);
+      alert(`Network Error: Could not reach the backend. Make sure VITE_API_URL is correct.`);
     } finally {
       setLoading(false);
     }
