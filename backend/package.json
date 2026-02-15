@@ -5,7 +5,9 @@
   "main": "index.mjs",
   "type": "module",
   "scripts": {
-    "start": "node index.mjs"
+    "start": "node index.mjs",
+    "build": "prisma generate",
+    "postinstall": "prisma generate"
   },
   "keywords": [],
   "author": "",
@@ -20,9 +22,8 @@
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
     "h3-js": "^4.4.0",
-    "pg": "^8.16.3"
-  },
-  "devDependencies": {
+    "pg": "^8.16.3",
     "prisma": "^7.2.0"
-  }
+  },
+  "devDependencies": {}
 }
