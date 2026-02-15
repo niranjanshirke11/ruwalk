@@ -21,7 +21,16 @@ BigInt.prototype.toJSON = function () {
 };
 
 const { Pool } = pgPkg;
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+
+if (!process.env.DATABASE_URL) {
+  console.error("FATAL: DATABASE_URL is not defined in environment variables!");
+}
+
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  max: 10 // Recommended for serverless to avoid connection exhaustion
+});
+
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
