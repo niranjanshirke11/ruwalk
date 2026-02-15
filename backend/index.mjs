@@ -456,7 +456,8 @@ app.get("/me/routes", async (req, res) => {
             id: true,
             name: true,
             distanceM: true,
-            polyline: true
+            polyline: true,
+            createdAt: true
           }
         }
       }
@@ -468,6 +469,8 @@ app.get("/me/routes", async (req, res) => {
       routes: user.activities.map(a => ({ 
         activityId: a.id, 
         name: a.name, 
+        distance: a.distanceM,
+        date: a.createdAt,
         polyline: a.polyline 
       })) 
     });
@@ -493,7 +496,8 @@ app.get("/users/:id/routes", async (req, res) => {
             id: true,
             name: true,
             distanceM: true,
-            polyline: true
+            polyline: true,
+            createdAt: true
           }
         }
       }
@@ -505,6 +509,8 @@ app.get("/users/:id/routes", async (req, res) => {
       routes: user.activities.map(a => ({ 
         activityId: a.id, 
         name: a.name, 
+        distance: a.distanceM,
+        date: a.createdAt,
         polyline: a.polyline 
       })) 
     });
@@ -550,6 +556,8 @@ app.get("/routes/my", async (req, res) => {
       routes: user.activities.map(a => ({ 
         activityId: a.id, 
         name: a.name, 
+        distance: a.distanceM,
+        date: a.createdAt,
         polyline: a.polyline 
       })) 
     });
