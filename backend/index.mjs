@@ -2,7 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from "dotenv";
 import axios from "axios";
-import pkg from "@prisma/client";
+import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import pgPkg from "pg";
 import * as turf from "@turf/turf";
@@ -20,7 +20,6 @@ BigInt.prototype.toJSON = function () {
   return this.toString();
 };
 
-const { PrismaClient } = pkg;
 const { Pool } = pgPkg;
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 const adapter = new PrismaPg(pool);
@@ -117,16 +116,16 @@ app.get("/strava/callback", async (req, res) => {
 
     // Redirect to frontend with user data
     // In a real app, you'd use a secure cookie or a token. 
-    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173"; 
+    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
     const redirectUrl = `${frontendUrl}/?user=${encodeURIComponent(JSON.stringify(userData))}&token=${tokens.access_token}`;
     res.redirect(redirectUrl);
 
   } catch (error) {
     const errorData = error.response?.data || error.message;
     console.error("[ERROR] Strava Callback Failed:", JSON.stringify(errorData));
-    res.status(500).json({ 
+    res.status(500).json({
       error: "Strava auth failed",
-      details: errorData 
+      details: errorData
     });
   }
 });
@@ -216,9 +215,9 @@ app.get("/strava/sync-latest", async (req, res) => {
   } catch (err) {
     const errorData = err.response?.data || err.message;
     console.error("[ERROR] Sync Failed:", JSON.stringify(errorData));
-    res.status(500).json({ 
-      error: "Sync failed", 
-      details: errorData 
+    res.status(500).json({
+      error: "Sync failed",
+      details: errorData
     });
   }
 });
@@ -289,7 +288,7 @@ app.get("/me/tiles", async (req, res) => {
     const user = await prisma.user.findUnique({
       where: { id: parseInt(userId) }
     });
-    
+
     if (!user) return res.status(404).json({ error: "User not found" });
 
     // current tiles
@@ -335,7 +334,7 @@ app.get("/users/:id/tiles", async (req, res) => {
     const user = await prisma.user.findUnique({
       where: { id: userId }
     });
-    
+
     if (!user) return res.status(404).json({ error: "User not found" });
 
     const current = await prisma.tileOwnership.findMany({
@@ -421,7 +420,7 @@ app.get("/tiles/history", async (req, res) => {
     if (!user) return res.status(404).json({ error: "User not found" });
 
     const history = await prisma.tileHistory.findMany({
-      where: { 
+      where: {
         OR: [
           { newUser: user.id },
           { previousUser: user.id }
@@ -444,12 +443,12 @@ app.get("/tiles/history", async (req, res) => {
 app.get("/me/routes", async (req, res) => {
   try {
     const userId = req.headers["x-user-id"];
-    
+
     if (!userId) return res.status(400).json({ error: "Missing x-user-id header" });
 
     const user = await prisma.user.findUnique({
       where: { id: parseInt(userId) },
-      include: { 
+      include: {
         activities: {
           orderBy: { createdAt: 'desc' },
           select: {
@@ -465,14 +464,14 @@ app.get("/me/routes", async (req, res) => {
 
     if (!user) return res.status(404).json({ error: "User not found" });
 
-    res.json({ 
-      routes: user.activities.map(a => ({ 
-        activityId: a.id, 
-        name: a.name, 
+    res.json({
+      routes: user.activities.map(a => ({
+        activityId: a.id,
+        name: a.name,
         distance: a.distanceM,
         date: a.createdAt,
-        polyline: a.polyline 
-      })) 
+        polyline: a.polyline
+      }))
     });
   } catch (err) {
     console.error(err);
@@ -484,12 +483,12 @@ app.get("/me/routes", async (req, res) => {
 app.get("/users/:id/routes", async (req, res) => {
   try {
     const userId = parseInt(req.params.id);
-    
+
     if (isNaN(userId)) return res.status(400).json({ error: "Invalid user id" });
 
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      include: { 
+      include: {
         activities: {
           orderBy: { createdAt: 'desc' },
           select: {
@@ -505,14 +504,14 @@ app.get("/users/:id/routes", async (req, res) => {
 
     if (!user) return res.status(404).json({ error: "User not found" });
 
-    res.json({ 
-      routes: user.activities.map(a => ({ 
-        activityId: a.id, 
-        name: a.name, 
+    res.json({
+      routes: user.activities.map(a => ({
+        activityId: a.id,
+        name: a.name,
         distance: a.distanceM,
         date: a.createdAt,
-        polyline: a.polyline 
-      })) 
+        polyline: a.polyline
+      }))
     });
   } catch (err) {
     console.error(err);
@@ -530,7 +529,7 @@ app.get("/routes/my", async (req, res) => {
   try {
     const user = await prisma.user.findUnique({
       where: { stravaAthleteId: BigInt(athleteId) },
-      include: { 
+      include: {
         activities: {
           orderBy: { createdAt: 'desc' },
           select: {
@@ -552,14 +551,14 @@ app.get("/routes/my", async (req, res) => {
       return res.status(404).json({ error: "User not found" });
     }
 
-    res.json({ 
-      routes: user.activities.map(a => ({ 
-        activityId: a.id, 
-        name: a.name, 
+    res.json({
+      routes: user.activities.map(a => ({
+        activityId: a.id,
+        name: a.name,
         distance: a.distanceM,
         date: a.createdAt,
-        polyline: a.polyline 
-      })) 
+        polyline: a.polyline
+      }))
     });
   } catch (err) {
     console.error(err);
@@ -918,7 +917,7 @@ app.post("/dev/seed-routes", async (req, res) => {
         // Each user gets a different area based on their index
         const offsetLat = ((i % 3) - 1) * 0.04; // -0.04, 0, +0.04
         const offsetLng = (Math.floor(i / 3) - 1) * 0.04;
-        
+
         const start = {
           lat: baseLat + offsetLat + (Math.random() - 0.5) * 0.02,
           lng: baseLng + offsetLng + (Math.random() - 0.5) * 0.02
@@ -1021,10 +1020,10 @@ app.post("/dev/seed-routes", async (req, res) => {
     });
   } catch (err) {
     console.error("[ERROR] Seed Routes Failed:", err);
-    res.status(500).json({ 
+    res.status(500).json({
       error: "Seed routes failed",
       message: err.message,
-      stack: err.stack 
+      stack: err.stack
     });
   }
 });
