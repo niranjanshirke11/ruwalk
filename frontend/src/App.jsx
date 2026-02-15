@@ -92,6 +92,30 @@ export default function App() {
     }
   }
 
+  async function handleSync() {
+    const token = localStorage.getItem("strava_token");
+    if (!token) return alert("Please log in again to sync.");
+
+    setLoading(true);
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || "http://localhost:4000";
+      const resp = await fetch(`${API_URL}/strava/sync-latest?token=${token}`);
+      const data = await resp.json();
+
+      if (data.error) {
+        alert(`Sync Error: ${data.error}`);
+      } else {
+        alert(`Success! Captured ${data.tiles?.captured_count || 0} tiles.`);
+        loadTerritory("me"); // Refresh map
+      }
+    } catch (err) {
+      console.error("Sync failed", err);
+      alert("Failed to sync activity.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   function handleLogout() {
     localStorage.removeItem("currentUser");
     localStorage.removeItem("strava_token");
@@ -132,6 +156,16 @@ export default function App() {
                     className="w-10 h-10 rounded-full border-2 border-gray-100"
                   />
                 )}
+                <button
+                  onClick={handleSync}
+                  disabled={loading}
+                  className={`px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2 ${loading
+                    ? "bg-gray-50 text-gray-400"
+                    : "bg-orange-50 text-orange-600 hover:bg-orange-100"
+                    }`}
+                >
+                  {loading ? "Syncing..." : "Sync Latest"}
+                </button>
                 <button
                   onClick={() => loadTerritory("me")}
                   className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-sm font-bold transition-colors"

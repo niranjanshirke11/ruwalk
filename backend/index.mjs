@@ -613,8 +613,11 @@ async function syncStravaActivity(accessToken, user) {
   const act = activitiesRes.data[0];
 
   if (!act) {
+    console.log("[DEBUG] No activities found for user", user.id);
     return { error: "No activities found" };
   }
+
+  console.log(`[DEBUG] Syncing activity: "${act.name}" (ID: ${act.id})`);
 
   // 4) Calculate capture status (start/end distance <= 200m)
   const start = act.start_latlng;
