@@ -1,5 +1,6 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import TerritoryMap from "./components/TerritoryMap";
+import LiveTrackingMap from "./components/LiveTrackingMap";
 import Leaderboard from "./components/Leaderboard";
 
 export default function App() {
@@ -9,16 +10,14 @@ export default function App() {
   const [routes, setRoutes] = useState([]);
   const [loading, setLoading] = useState(false);
   const [isMapReady, setIsMapReady] = useState(false);
-
-  const mapReadyRef = useRef({ setIsMapReady });
+  const [mode, setMode] = useState("live"); // "live" | "strava"
 
   function handleMapReady() {
     setIsMapReady(true);
   }
 
-  // Check for login on mount
+  // ─── Check for Strava login redirect on mount ───────────────────────────────
   useEffect(() => {
-    // 1. Check URL for user data (redirect from backend)
     const params = new URLSearchParams(window.location.search);
     const userParam = params.get("user");
     const tokenParam = params.get("token");
@@ -29,29 +28,21 @@ export default function App() {
         localStorage.setItem("currentUser", JSON.stringify(user));
         if (tokenParam) localStorage.setItem("strava_token", tokenParam);
         setCurrentUser(user);
-
-        // Clear URL
         window.history.replaceState({}, document.title, "/");
       } catch (err) {
         console.error("Failed to parse user param", err);
       }
     } else {
-      // 2. Check localStorage
       const stored = localStorage.getItem("currentUser");
-      if (stored) {
-        setCurrentUser(JSON.parse(stored));
-      }
+      if (stored) setCurrentUser(JSON.parse(stored));
     }
   }, []);
 
-  // UseEffect to load my data when logged in
+  // ─── Load territory data when user logs in ──────────────────────────────────
   useEffect(() => {
-    if (currentUser) {
-      loadTerritory("me");
-    }
+    if (currentUser) loadTerritory("me");
   }, [currentUser]);
 
-  // Unified loader: 'me' or userId
   async function loadTerritory(target) {
     setLoading(true);
     setCurrentTiles([]);
@@ -59,10 +50,9 @@ export default function App() {
     setRoutes([]);
 
     try {
-      let tilesUrl, routesUrl;
-      const headers = {};
-
       const API_URL = import.meta.env.VITE_API_URL || "http://localhost:4000";
+      const headers = {};
+      let tilesUrl, routesUrl;
 
       if (target === "me") {
         if (!currentUser) return;
@@ -70,20 +60,18 @@ export default function App() {
         routesUrl = `${API_URL}/me/routes`;
         headers["x-user-id"] = currentUser.id;
       } else {
-        // Public view
         tilesUrl = `${API_URL}/users/${target}/tiles?history=true`;
         routesUrl = `${API_URL}/users/${target}/routes`;
       }
 
       const [tilesResp, routesResp] = await Promise.all([
-        fetch(tilesUrl, { headers }).then((r) => r.json()),
-        fetch(routesUrl, { headers }).then((r) => r.json()),
+        fetch(tilesUrl, { headers }).then(r => r.json()),
+        fetch(routesUrl, { headers }).then(r => r.json()),
       ]);
 
       if (tilesResp.error) throw new Error(tilesResp.error);
-
       setCurrentTiles(tilesResp.tiles || []);
-      setHistoryTiles((tilesResp.history || []).map((h) => h.tileId));
+      setHistoryTiles((tilesResp.history || []).map(h => h.tileId));
       setRoutes(routesResp.routes || []);
     } catch (err) {
       console.error("Failed loading territory", err);
@@ -104,20 +92,19 @@ export default function App() {
       if (!resp.ok) {
         const errorText = await resp.text();
         console.error("Sync server error:", errorText);
-        return alert(`Server Error (${resp.status}): The sync took too long or failed. Check Vercel logs.`);
+        return alert(`Server Error (${resp.status}): Check Vercel logs.`);
       }
 
       const data = await resp.json();
-
       if (data.error) {
         alert(`Sync Error: ${data.error}`);
       } else {
         alert(`Success! Captured ${data.tiles?.captured_count || 0} tiles.`);
-        loadTerritory("me"); // Refresh map
+        loadTerritory("me");
       }
     } catch (err) {
       console.error("Sync request failed", err);
-      alert(`Network Error: Could not reach the backend. Make sure VITE_API_URL is correct.`);
+      alert("Network Error: Could not reach the backend.");
     } finally {
       setLoading(false);
     }
@@ -132,32 +119,36 @@ export default function App() {
     setRoutes([]);
   }
 
+  // Called when a live run ends — refresh territory map with new tiles
+  function handleRunEnd(summary) {
+    console.log("[APP] Live run ended:", summary);
+    if (currentUser) loadTerritory("me");
+  }
+
+  const API_URL = import.meta.env.VITE_API_URL || "http://localhost:4000";
+
   return (
     <div className="min-h-screen bg-gray-100 p-4 font-sans">
       <div className="max-w-6xl mx-auto">
-        <div className="flex items-center justify-between mb-8 bg-white p-4 rounded-3xl shadow-sm border border-gray-100">
+
+        {/* ── HEADER ── */}
+        <div className="flex items-center justify-between mb-6 bg-white p-4 rounded-3xl shadow-sm border border-gray-100">
           <div className="flex items-center gap-4">
             <img src="/favicon.png" alt="Ruwalk Logo" className="w-12 h-12 rounded-xl shadow-sm" />
             <div>
-              <h1 className="text-3xl font-black tracking-tight text-gray-900">
-                Ruwalk
-              </h1>
-              <p className="text-gray-500 font-medium">
-                Capture the world, one run at a time.
-              </p>
+              <h1 className="text-3xl font-black tracking-tight text-gray-900">Ruwalk</h1>
+              <p className="text-gray-500 font-medium">Capture the world, one run at a time.</p>
             </div>
           </div>
 
           <div>
             {currentUser ? (
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-3">
                 <div className="text-right hidden sm:block">
                   <p className="font-bold text-gray-900">
                     {currentUser.firstname} {currentUser.lastname}
                   </p>
-                  <p className="text-xs text-gray-500 font-medium">
-                    @{currentUser.username}
-                  </p>
+                  <p className="text-xs text-gray-500 font-medium">@{currentUser.username}</p>
                 </div>
                 {currentUser.profile && (
                   <img
@@ -167,22 +158,6 @@ export default function App() {
                   />
                 )}
                 <button
-                  onClick={handleSync}
-                  disabled={loading}
-                  className={`px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2 ${loading
-                    ? "bg-gray-50 text-gray-400"
-                    : "bg-orange-50 text-orange-600 hover:bg-orange-100"
-                    }`}
-                >
-                  {loading ? "Syncing..." : "Sync Latest"}
-                </button>
-                <button
-                  onClick={() => loadTerritory("me")}
-                  className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-sm font-bold transition-colors"
-                >
-                  My Map
-                </button>
-                <button
                   onClick={handleLogout}
                   className="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl text-sm font-bold transition-colors"
                 >
@@ -191,7 +166,7 @@ export default function App() {
               </div>
             ) : (
               <a
-                href={`${import.meta.env.VITE_API_URL || "http://localhost:4000"}/strava/login`}
+                href={`${API_URL}/strava/login`}
                 className="flex items-center gap-2 px-6 py-3 bg-[#FC4C02] text-white font-bold rounded-xl hover:bg-[#e34402] transition-colors shadow-lg shadow-orange-500/20"
               >
                 Connect Strava
@@ -200,42 +175,121 @@ export default function App() {
           </div>
         </div>
 
+        {/* ── MODE SWITCHER ── */}
+        <div className="flex gap-2 mb-6 bg-white p-2 rounded-2xl shadow-sm border border-gray-100 w-fit">
+          <button
+            onClick={() => setMode("live")}
+            className={`px-5 py-2.5 rounded-xl text-sm font-black transition-all ${mode === "live"
+                ? "bg-indigo-600 text-white shadow-md shadow-indigo-500/25"
+                : "text-gray-500 hover:bg-gray-50"
+              }`}
+          >
+            📍 Live Capture
+          </button>
+          <button
+            onClick={() => setMode("strava")}
+            className={`px-5 py-2.5 rounded-xl text-sm font-black transition-all ${mode === "strava"
+                ? "bg-orange-500 text-white shadow-md shadow-orange-500/25"
+                : "text-gray-500 hover:bg-gray-50"
+              }`}
+          >
+            🏃 Strava Sync
+          </button>
+        </div>
+
+        {/* ── MAIN CONTENT GRID ── */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
           <div className="lg:col-span-2 space-y-4">
-            <div className="bg-white rounded-[2rem] shadow-xl overflow-hidden border border-gray-100 relative">
-              {loading && (
-                <div className="absolute inset-0 bg-white/50 backdrop-blur-sm z-10 flex items-center justify-center">
-                  <div className="animate-spin rounded-full h-12 w-12 border-4 border-gray-200 border-t-black"></div>
+
+            {/* ── LIVE CAPTURE MODE ── */}
+            {mode === "live" && (
+              <div className="bg-white rounded-[2rem] shadow-xl overflow-hidden border border-gray-100 p-4">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h2 className="text-lg font-black text-gray-900">Live Territory Capture</h2>
+                    <p className="text-xs text-gray-500 font-medium">
+                      Walk or run to capture H3 hexagons in real time.
+                    </p>
+                  </div>
+                  <span className="px-3 py-1 bg-indigo-50 text-indigo-600 text-xs font-bold rounded-full">
+                    Live
+                  </span>
                 </div>
-              )}
-              <div className="aspect-[4/3] w-full">
-                <TerritoryMap
-                  currentTiles={currentTiles}
-                  historyTiles={historyTiles}
-                  routes={routes}
-                  onMapReady={handleMapReady}
+                <LiveTrackingMap
+                  currentUser={currentUser}
+                  onRunEnd={handleRunEnd}
                 />
               </div>
-            </div>
+            )}
 
-            <div className="flex gap-4 px-2">
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-                <span className="text-sm font-bold text-gray-600">
-                  {currentTiles.length} Current Tiles
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-gray-300"></div>
-                <span className="text-sm font-bold text-gray-600">
-                  {historyTiles.length} History
-                </span>
-              </div>
-            </div>
+            {/* ── STRAVA SYNC MODE ── */}
+            {mode === "strava" && (
+              <>
+                <div className="bg-white rounded-[2rem] shadow-xl overflow-hidden border border-gray-100 relative">
+                  {loading && (
+                    <div className="absolute inset-0 bg-white/50 backdrop-blur-sm z-10 flex items-center justify-center">
+                      <div className="animate-spin rounded-full h-12 w-12 border-4 border-gray-200 border-t-black" />
+                    </div>
+                  )}
+
+                  {/* Action bar */}
+                  <div className="flex gap-3 p-4 border-b border-gray-50">
+                    <button
+                      onClick={handleSync}
+                      disabled={loading || !currentUser}
+                      className={`px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2 ${loading || !currentUser
+                          ? "bg-gray-50 text-gray-400"
+                          : "bg-orange-50 text-orange-600 hover:bg-orange-100"
+                        }`}
+                    >
+                      {loading ? "Syncing…" : "⟳ Sync Latest Activity"}
+                    </button>
+                    <button
+                      onClick={() => loadTerritory("me")}
+                      disabled={!currentUser}
+                      className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-sm font-bold transition-colors"
+                    >
+                      My Map
+                    </button>
+                  </div>
+
+                  <div className="aspect-[4/3] w-full">
+                    <TerritoryMap
+                      currentTiles={currentTiles}
+                      historyTiles={historyTiles}
+                      routes={routes}
+                      onMapReady={handleMapReady}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex gap-4 px-2">
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full bg-blue-500" />
+                    <span className="text-sm font-bold text-gray-600">
+                      {currentTiles.length} Current Tiles
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full bg-gray-300" />
+                    <span className="text-sm font-bold text-gray-600">
+                      {historyTiles.length} History
+                    </span>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
 
+          {/* ── SIDEBAR: Leaderboard ── */}
           <div>
-            <Leaderboard onSelectUser={(userId) => loadTerritory(userId)} />
+            <Leaderboard
+              onSelectUser={(userId) => {
+                setMode("strava");
+                loadTerritory(userId);
+              }}
+            />
           </div>
         </div>
       </div>

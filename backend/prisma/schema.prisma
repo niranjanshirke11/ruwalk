@@ -25,8 +25,9 @@ model User {
 
 model Activity {
   id            Int      @id @default(autoincrement())
-  stravaId      BigInt   @unique
+  stravaId      BigInt?  @unique          // nullable: live runs have no Strava ID
   userId        Int
+  source        String   @default("strava") // "strava" | "live"
   name          String?
   distanceM     Float?
   movingTimeS   Int?
@@ -34,11 +35,12 @@ model Activity {
   startLng      Float?
   endLat        Float?
   endLng        Float?
-  polyline      String?
-  captured      Boolean  @default(false) // true if start-end <=200m rule passes
+  polyline      String?                   // encoded polyline (strava) or null (live)
+  captured      Boolean  @default(false)  // true if closed-loop rule passes (strava) or always true (live)
   createdAt     DateTime @default(now())
 
   user          User     @relation(fields: [userId], references: [id])
+  tileHistory   TileHistory[]
 }
 
 model TileOwnership {
@@ -53,16 +55,17 @@ model TileOwnership {
 }
 
 model TileHistory {
-  id           Int      @id @default(autoincrement())
+  id           Int       @id @default(autoincrement())
   tileId       String
-  previousUser Int?     // nullable, who lost the tile if any
-  newUser      Int      // who captured the tile
-  activityId   Int?     // optional: which activity caused capture
-  createdAt    DateTime @default(now())
+  previousUser Int?      // nullable: who lost the tile (null = first capture)
+  newUser      Int       // who captured the tile
+  activityId   Int?      // which activity caused the capture (strava or live)
+  createdAt    DateTime  @default(now())
 
-  // optional relations
-  userNew      User?    @relation("TileHistoryNewUser", fields: [newUser], references: [id])
-  userPrev     User?    @relation("TileHistoryPrevUser", fields: [previousUser], references: [id])
+  userNew      User?     @relation("TileHistoryNewUser", fields: [newUser], references: [id])
+  userPrev     User?     @relation("TileHistoryPrevUser", fields: [previousUser], references: [id])
+  activity     Activity? @relation(fields: [activityId], references: [id])
 
   @@index([tileId])
+  @@index([newUser])
 }

@@ -1040,6 +1040,224 @@ app.post("/dev/seed-routes", async (req, res) => {
   }
 });
 
+
+// ========== LIVE TRACKING ROUTES ==========
+// These routes power the real-time territory capture mode.
+// No WebSockets needed - the frontend polls /live/world-tiles every 5s.
+
+const LIVE_H3_RESOLUTION = 10;  // ~65m hex size, same as Strava pipeline
+
+/**
+ * POST /live/start-run
+ * Called when the user taps "Start Live Run".
+ * Creates a new Activity record with source="live" and returns its ID.
+ * The frontend stores this runId and sends it with every tile capture.
+ *
+ * Headers: x-user-id (required)
+ * Body: { name?: string }
+ */
+app.post("/live/start-run", async (req, res) => {
+  try {
+    const userId = parseInt(req.headers["x-user-id"]);
+    if (!userId || isNaN(userId)) {
+      return res.status(400).json({ error: "Missing or invalid x-user-id header" });
+    }
+
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    const { name } = req.body;
+
+    const activity = await prisma.activity.create({
+      data: {
+        userId: user.id,
+        source: "live",
+        name: name || `Live Run – ${new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}`,
+        captured: true,  // live runs always count
+      }
+    });
+
+    console.log(`[LIVE] User ${userId} started run #${activity.id}`);
+    res.json({ runId: activity.id, message: "Run started" });
+
+  } catch (err) {
+    console.error("[ERROR] live/start-run:", err.message);
+    res.status(500).json({ error: "Failed to start run" });
+  }
+});
+
+/**
+ * POST /live/capture-tile
+ * Called every time the user enters a new H3 hex while running.
+ * Applies the same ownership / battle logic as the Strava pipeline.
+ *
+ * Headers: x-user-id (required)
+ * Body: {
+ *   runId:  number,   -- the activity id from /live/start-run
+ *   lat:    number,
+ *   lng:    number,
+ *   prevLat?: number, -- previous point, for speed anti-cheat
+ *   prevLng?: number,
+ *   elapsedMs?: number  -- ms since last point, for speed anti-cheat
+ * }
+ */
+app.post("/live/capture-tile", async (req, res) => {
+  try {
+    const userId = parseInt(req.headers["x-user-id"]);
+    if (!userId || isNaN(userId)) {
+      return res.status(400).json({ error: "Missing x-user-id" });
+    }
+
+    const { runId, lat, lng, prevLat, prevLng, elapsedMs } = req.body;
+
+    if (!runId || lat == null || lng == null) {
+      return res.status(400).json({ error: "Missing runId, lat, or lng" });
+    }
+
+    // --- Anti-cheat: speed check ---
+    if (prevLat != null && prevLng != null && elapsedMs > 0) {
+      const from = turf.point([prevLng, prevLat]);
+      const to = turf.point([lng, lat]);
+      const distKm = turf.distance(from, to, { units: "kilometers" });
+      const speedKmh = (distKm / (elapsedMs / 1000)) * 3600;
+
+      if (speedKmh > 25) {
+        console.warn(`[LIVE] Speed violation: ${speedKmh.toFixed(1)} km/h for user ${userId}`);
+        return res.json({ status: "speed_violation", speedKmh: Math.round(speedKmh) });
+      }
+    }
+
+    const tileId = latLngToCell(lat, lng, LIVE_H3_RESOLUTION);
+
+    // --- Update distance on the activity ---
+    if (prevLat != null && prevLng != null) {
+      const distKm = turf.distance(
+        turf.point([prevLng, prevLat]),
+        turf.point([lng, lat]),
+        { units: "kilometers" }
+      );
+      await prisma.activity.update({
+        where: { id: runId },
+        data: { distanceM: { increment: distKm * 1000 } }
+      });
+    }
+
+    // --- Capture logic (same as Strava pipeline) ---
+    const existing = await prisma.tileOwnership.findUnique({
+      where: { tileId },
+      select: { id: true, userId: true }
+    });
+
+    if (!existing) {
+      // Brand new tile — first capture
+      await prisma.tileOwnership.create({
+        data: { tileId, userId }
+      });
+      await prisma.tileHistory.create({
+        data: { tileId, previousUser: null, newUser: userId, activityId: runId }
+      });
+      return res.json({ status: "captured", tileId });
+    }
+
+    if (existing.userId === userId) {
+      // Already owned by this user — no change needed
+      return res.json({ status: "already_owned", tileId });
+    }
+
+    // Tile owned by someone else — steal it
+    await prisma.tileOwnership.update({
+      where: { id: existing.id },
+      data: { userId }
+    });
+    await prisma.tileHistory.create({
+      data: { tileId, previousUser: existing.userId, newUser: userId, activityId: runId }
+    });
+
+    console.log(`[LIVE] User ${userId} stole tile ${tileId} from user ${existing.userId}`);
+    return res.json({ status: "stolen", tileId, stolenFrom: existing.userId });
+
+  } catch (err) {
+    console.error("[ERROR] live/capture-tile:", err.message);
+    res.status(500).json({ error: "Capture failed" });
+  }
+});
+
+/**
+ * POST /live/end-run
+ * Called when the user taps "Stop Run". Marks the run end time.
+ *
+ * Headers: x-user-id (required)
+ * Body: { runId: number }
+ */
+app.post("/live/end-run", async (req, res) => {
+  try {
+    const userId = parseInt(req.headers["x-user-id"]);
+    const { runId } = req.body;
+
+    if (!userId || !runId) {
+      return res.status(400).json({ error: "Missing x-user-id or runId" });
+    }
+
+    // Verify the run belongs to this user
+    const activity = await prisma.activity.findFirst({
+      where: { id: runId, userId, source: "live" }
+    });
+
+    if (!activity) {
+      return res.status(404).json({ error: "Run not found or not owned by user" });
+    }
+
+    // Count how many tiles were captured in this run
+    const tileCount = await prisma.tileHistory.count({
+      where: { activityId: runId, newUser: userId }
+    });
+
+    console.log(`[LIVE] User ${userId} ended run #${runId} — ${tileCount} new tiles`);
+    res.json({
+      message: "Run ended",
+      runId,
+      tilesCaptured: tileCount,
+      distanceM: Math.round(activity.distanceM || 0)
+    });
+
+  } catch (err) {
+    console.error("[ERROR] live/end-run:", err.message);
+    res.status(500).json({ error: "Failed to end run" });
+  }
+});
+
+/**
+ * GET /live/world-tiles
+ * Returns all tiles currently on the world map with owner info.
+ * The frontend polls this every 5s during a live run to refresh the map.
+ * Optional bbox filtering: ?minLat=&minLng=&maxLat=&maxLng=
+ * (For now returns all tiles — safe at small scale)
+ */
+app.get("/live/world-tiles", async (req, res) => {
+  try {
+    const tiles = await prisma.tileOwnership.findMany({
+      select: {
+        tileId: true,
+        userId: true,
+        user: { select: { firstname: true, lastname: true } }
+      },
+    });
+
+    res.json(tiles.map(t => ({
+      tileId: t.tileId,
+      userId: t.userId,
+      ownerName: t.user ? `${t.user.firstname || ""} ${t.user.lastname || ""}`.trim() : "Unknown"
+    })));
+
+  } catch (err) {
+    console.error("[ERROR] live/world-tiles:", err.message);
+    res.status(500).json({ error: "Failed to fetch world tiles" });
+  }
+});
+
+// ========================================
+
 app.listen(PORT, () => {
   console.log(`Server started on http://localhost:${PORT}`);
 });
+
