@@ -1,0 +1,71 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
+  output          = "./generated/client"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id              Int      @id @default(autoincrement())
+  stravaAthleteId BigInt   @unique
+  username        String?
+  firstname       String?
+  lastname        String?
+  profile         String?
+  createdAt       DateTime @default(now())
+
+  activities      Activity[]
+  tiles           TileOwnership[]
+  historyCaptured TileHistory[]   @relation("TileHistoryNewUser")
+  historyLost     TileHistory[]   @relation("TileHistoryPrevUser")
+}
+
+model Activity {
+  id          Int      @id @default(autoincrement())
+  stravaId    BigInt?  @unique // nullable: live runs have no Strava ID
+  userId      Int
+  source      String   @default("strava") // "strava" | "live"
+  name        String?
+  distanceM   Float?
+  movingTimeS Int?
+  startLat    Float?
+  startLng    Float?
+  endLat      Float?
+  endLng      Float?
+  polyline    String? // encoded polyline (strava) or null (live)
+  captured    Boolean  @default(false) // true if closed-loop rule passes (strava) or always true (live)
+  createdAt   DateTime @default(now())
+
+  user        User          @relation(fields: [userId], references: [id])
+  tileHistory TileHistory[]
+}
+
+model TileOwnership {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  tileId    String // H3 tile id or grid tile string
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([tileId]) // only one owner per tile
+}
+
+model TileHistory {
+  id           Int      @id @default(autoincrement())
+  tileId       String
+  previousUser Int? // nullable: who lost the tile (null = first capture)
+  newUser      Int // who captured the tile
+  activityId   Int? // which activity caused the capture (strava or live)
+  createdAt    DateTime @default(now())
+
+  userNew  User?     @relation("TileHistoryNewUser", fields: [newUser], references: [id])
+  userPrev User?     @relation("TileHistoryPrevUser", fields: [previousUser], references: [id])
+  activity Activity? @relation(fields: [activityId], references: [id])
+
+  @@index([tileId])
+  @@index([newUser])
+}
