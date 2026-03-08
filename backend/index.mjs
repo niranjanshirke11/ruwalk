@@ -647,8 +647,28 @@ async function syncStravaActivity(accessToken, user) {
       // decode polyline -> array of [lat, lng]
       const points = polyline.decode(encoded);
 
+      // --- Densify the path to ensure we don't skip over any hexes ---
+      let densePoints = [];
+      if (points.length > 1) {
+        // turf.lineString takes [lng, lat]
+        const line = turf.lineString(points.map(p => [p[1], p[0]]));
+        const lineLength = turf.length(line, { units: "kilometers" }) * 1000;
+
+        const chunkLength = 20; // 20 meters step
+        for (let d = 0; d <= lineLength; d += chunkLength) {
+          const pt = turf.along(line, d / 1000, { units: "kilometers" });
+          densePoints.push([pt.geometry.coordinates[1], pt.geometry.coordinates[0]]);
+        }
+
+        // ensure the last point is included
+        const last = points[points.length - 1];
+        densePoints.push([last[0], last[1]]);
+      } else {
+        densePoints = points;
+      }
+
       const tileSet = new Set();
-      for (const [lat, lng] of points) {
+      for (const [lat, lng] of densePoints) {
         const tileId = latLngToCell(lat, lng, RESOLUTION);
         tileSet.add(tileId);
       }

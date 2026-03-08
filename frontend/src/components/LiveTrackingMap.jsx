@@ -247,6 +247,33 @@ export default function LiveTrackingMap({ currentUser, onRunEnd }) {
         // ─── Tile capture — only while running ──────────────────────────────
         if (!state.isRunning) return;
 
+        // ─── Haversine distance counter ──────────────────────────────────────
+        // Calculate distance FIRST, even if we haven't crossed a tile boundary
+        if (state.prevLat != null) {
+            const dLat = (lat - state.prevLat) * Math.PI / 180;
+            const dLng = (lng - state.prevLng) * Math.PI / 180;
+            const a = Math.sin(dLat / 2) ** 2
+                + Math.cos(state.prevLat * Math.PI / 180)
+                * Math.cos(lat * Math.PI / 180)
+                * Math.sin(dLng / 2) ** 2;
+            const d = 6_371_000 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+            // Only update UI distance if we moved a reasonable amount (e.g. at least 1 meter)
+            if (d > 1) {
+                setStats(prev => ({ ...prev, distanceM: Math.round(prev.distanceM + d) }));
+            }
+        }
+
+        // Cache previous values for API payload BEFORE overwriting them
+        const pLat = state.prevLat;
+        const pLng = state.prevLng;
+        const pTime = state.prevTime;
+
+        // Overwrite prev tracking values to current immediately for the next tick
+        state.prevLat = lat;
+        state.prevLng = lng;
+        state.prevTime = now;
+
         const tileId = latLngToCell(lat, lng, H3_RES);
         if (tileId === state.lastTileId) return;   // same hex, skip
         state.lastTileId = tileId;
@@ -257,9 +284,9 @@ export default function LiveTrackingMap({ currentUser, onRunEnd }) {
         const body = {
             runId: state.runId,
             lat, lng,
-            prevLat: state.prevLat,
-            prevLng: state.prevLng,
-            elapsedMs: state.prevTime ? now - state.prevTime : null,
+            prevLat: pLat,
+            prevLng: pLng,
+            elapsedMs: pTime ? now - pTime : null,
         };
 
         try {
@@ -287,22 +314,6 @@ export default function LiveTrackingMap({ currentUser, onRunEnd }) {
         } catch (err) {
             console.error("[LIVE] capture-tile error:", err.message);
         }
-
-        // ─── Haversine distance counter ──────────────────────────────────────
-        if (state.prevLat != null) {
-            const dLat = (lat - state.prevLat) * Math.PI / 180;
-            const dLng = (lng - state.prevLng) * Math.PI / 180;
-            const a = Math.sin(dLat / 2) ** 2
-                + Math.cos(state.prevLat * Math.PI / 180)
-                * Math.cos(lat * Math.PI / 180)
-                * Math.sin(dLng / 2) ** 2;
-            const d = 6_371_000 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-            setStats(prev => ({ ...prev, distanceM: Math.round(prev.distanceM + d) }));
-        }
-
-        state.prevLat = lat;
-        state.prevLng = lng;
-        state.prevTime = now;
     });
 
 
@@ -319,7 +330,7 @@ export default function LiveTrackingMap({ currentUser, onRunEnd }) {
             setGpsStatus("error");
         };
 
-        const opts = { enableHighAccuracy: true, maximumAge: 0, timeout: 30_000 };
+        const opts = { enableHighAccuracy: true, maximumAge: 0, timeout: 5_000 };
 
         // Get a quick initial fix first
         navigator.geolocation.getCurrentPosition(
@@ -328,17 +339,20 @@ export default function LiveTrackingMap({ currentUser, onRunEnd }) {
             { enableHighAccuracy: true, timeout: 15_000, maximumAge: 5_000 }
         );
 
-        // Then continuous watch
-        const id = navigator.geolocation.watchPosition(
-            (pos) => onPosition.current(pos),
-            onErr,
-            opts
-        );
+        // Instead of watchPosition, which stalls on some mobile browsers after a few seconds,
+        // we use an aggressive polling loop to ensure constant dot updating and tracking.
+        const id = setInterval(() => {
+            navigator.geolocation.getCurrentPosition(
+                (pos) => onPosition.current(pos),
+                (err) => console.warn("GPS poll slip:", err.message),
+                opts
+            );
+        }, 3000);
         watchIdRef.current = id;
 
         return () => {
             if (watchIdRef.current != null) {
-                navigator.geolocation.clearWatch(watchIdRef.current);
+                clearInterval(watchIdRef.current);
                 watchIdRef.current = null;
             }
         };
