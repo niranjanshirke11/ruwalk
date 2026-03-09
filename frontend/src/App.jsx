@@ -119,6 +119,29 @@ export default function App() {
     setRoutes([]);
   }
 
+  async function handleReset() {
+    if (!window.confirm("🚨 WARNING: Are you sure you want to CLEAR the entire database (all tiles, users, and activities)?")) return;
+
+    setLoading(true);
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || "http://localhost:4000";
+      const resp = await fetch(`${API_URL}/dev/reset`, { method: "POST" });
+      const data = await resp.json();
+
+      if (!resp.ok) {
+        throw new Error(data.error || "Reset failed");
+      }
+      alert(data.message);
+      handleLogout();
+      window.location.reload();
+    } catch (err) {
+      console.error("Reset failed", err);
+      alert("Error: " + err.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
   // Called when a live run ends — refresh territory map with new tiles
   function handleRunEnd(summary) {
     console.log("[APP] Live run ended:", summary);
@@ -175,25 +198,34 @@ export default function App() {
           </div>
         </div>
 
-        {/* ── MODE SWITCHER ── */}
-        <div className="flex gap-2 mb-6 bg-white p-2 rounded-2xl shadow-sm border border-gray-100 w-fit">
-          <button
-            onClick={() => setMode("live")}
-            className={`px-5 py-2.5 rounded-xl text-sm font-black transition-all ${mode === "live"
+        {/* ── MODE SWITCHER & ACTIONS ── */}
+        <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+          <div className="flex gap-2 bg-white p-2 rounded-2xl shadow-sm border border-gray-100 w-fit">
+            <button
+              onClick={() => setMode("live")}
+              className={`px-5 py-2.5 rounded-xl text-sm font-black transition-all ${mode === "live"
                 ? "bg-indigo-600 text-white shadow-md shadow-indigo-500/25"
                 : "text-gray-500 hover:bg-gray-50"
-              }`}
-          >
-            📍 Live Capture
-          </button>
-          <button
-            onClick={() => setMode("strava")}
-            className={`px-5 py-2.5 rounded-xl text-sm font-black transition-all ${mode === "strava"
+                }`}
+            >
+              📍 Live Capture
+            </button>
+            <button
+              onClick={() => setMode("strava")}
+              className={`px-5 py-2.5 rounded-xl text-sm font-black transition-all ${mode === "strava"
                 ? "bg-orange-500 text-white shadow-md shadow-orange-500/25"
                 : "text-gray-500 hover:bg-gray-50"
-              }`}
+                }`}
+            >
+              🏃 Strava Sync
+            </button>
+          </div>
+
+          <button
+            onClick={handleReset}
+            className="px-5 py-2.5 bg-red-100 text-red-700 hover:bg-red-200 rounded-xl text-sm font-black transition-colors border border-red-200 shadow-sm"
           >
-            🏃 Strava Sync
+            ⚠️ Reset Database
           </button>
         </div>
 
@@ -239,8 +271,8 @@ export default function App() {
                       onClick={handleSync}
                       disabled={loading || !currentUser}
                       className={`px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2 ${loading || !currentUser
-                          ? "bg-gray-50 text-gray-400"
-                          : "bg-orange-50 text-orange-600 hover:bg-orange-100"
+                        ? "bg-gray-50 text-gray-400"
+                        : "bg-orange-50 text-orange-600 hover:bg-orange-100"
                         }`}
                     >
                       {loading ? "Syncing…" : "⟳ Sync Latest Activity"}
