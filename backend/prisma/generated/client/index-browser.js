@@ -123,6 +123,8 @@ exports.Prisma.TransactionIsolationLevel = makeStrictEnum({
 exports.Prisma.UserScalarFieldEnum = {
   id: 'id',
   stravaAthleteId: 'stravaAthleteId',
+  guestId: 'guestId',
+  isGuest: 'isGuest',
   username: 'username',
   firstname: 'firstname',
   lastname: 'lastname',

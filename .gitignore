@@ -2,3 +2,6 @@
 
 REAL_USER_TESTING.md
 TESTING_GUIDE.md
+.aider*
+.aiderignore
+.aider_env

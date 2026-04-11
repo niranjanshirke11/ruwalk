@@ -1248,6 +1248,8 @@ export namespace Prisma {
   export type UserMinAggregateOutputType = {
     id: number | null
     stravaAthleteId: bigint | null
+    guestId: string | null
+    isGuest: boolean | null
     username: string | null
     firstname: string | null
     lastname: string | null
@@ -1258,6 +1260,8 @@ export namespace Prisma {
   export type UserMaxAggregateOutputType = {
     id: number | null
     stravaAthleteId: bigint | null
+    guestId: string | null
+    isGuest: boolean | null
     username: string | null
     firstname: string | null
     lastname: string | null
@@ -1268,6 +1272,8 @@ export namespace Prisma {
   export type UserCountAggregateOutputType = {
     id: number
     stravaAthleteId: number
+    guestId: number
+    isGuest: number
     username: number
     firstname: number
     lastname: number
@@ -1290,6 +1296,8 @@ export namespace Prisma {
   export type UserMinAggregateInputType = {
     id?: true
     stravaAthleteId?: true
+    guestId?: true
+    isGuest?: true
     username?: true
     firstname?: true
     lastname?: true
@@ -1300,6 +1308,8 @@ export namespace Prisma {
   export type UserMaxAggregateInputType = {
     id?: true
     stravaAthleteId?: true
+    guestId?: true
+    isGuest?: true
     username?: true
     firstname?: true
     lastname?: true
@@ -1310,6 +1320,8 @@ export namespace Prisma {
   export type UserCountAggregateInputType = {
     id?: true
     stravaAthleteId?: true
+    guestId?: true
+    isGuest?: true
     username?: true
     firstname?: true
     lastname?: true
@@ -1406,7 +1418,9 @@ export namespace Prisma {
 
   export type UserGroupByOutputType = {
     id: number
-    stravaAthleteId: bigint
+    stravaAthleteId: bigint | null
+    guestId: string | null
+    isGuest: boolean
     username: string | null
     firstname: string | null
     lastname: string | null
@@ -1436,6 +1450,8 @@ export namespace Prisma {
   export type UserSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
     id?: boolean
     stravaAthleteId?: boolean
+    guestId?: boolean
+    isGuest?: boolean
     username?: boolean
     firstname?: boolean
     lastname?: boolean
@@ -1451,6 +1467,8 @@ export namespace Prisma {
   export type UserSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
     id?: boolean
     stravaAthleteId?: boolean
+    guestId?: boolean
+    isGuest?: boolean
     username?: boolean
     firstname?: boolean
     lastname?: boolean
@@ -1461,6 +1479,8 @@ export namespace Prisma {
   export type UserSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
     id?: boolean
     stravaAthleteId?: boolean
+    guestId?: boolean
+    isGuest?: boolean
     username?: boolean
     firstname?: boolean
     lastname?: boolean
@@ -1471,6 +1491,8 @@ export namespace Prisma {
   export type UserSelectScalar = {
     id?: boolean
     stravaAthleteId?: boolean
+    guestId?: boolean
+    isGuest?: boolean
     username?: boolean
     firstname?: boolean
     lastname?: boolean
@@ -1478,7 +1500,7 @@ export namespace Prisma {
     createdAt?: boolean
   }
 
-  export type UserOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "stravaAthleteId" | "username" | "firstname" | "lastname" | "profile" | "createdAt", ExtArgs["result"]["user"]>
+  export type UserOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "stravaAthleteId" | "guestId" | "isGuest" | "username" | "firstname" | "lastname" | "profile" | "createdAt", ExtArgs["result"]["user"]>
   export type UserInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     activities?: boolean | User$activitiesArgs<ExtArgs>
     tiles?: boolean | User$tilesArgs<ExtArgs>
@@ -1499,7 +1521,9 @@ export namespace Prisma {
     }
     scalars: $Extensions.GetPayloadResult<{
       id: number
-      stravaAthleteId: bigint
+      stravaAthleteId: bigint | null
+      guestId: string | null
+      isGuest: boolean
       username: string | null
       firstname: string | null
       lastname: string | null
@@ -1934,6 +1958,8 @@ export namespace Prisma {
   interface UserFieldRefs {
     readonly id: FieldRef<"User", 'Int'>
     readonly stravaAthleteId: FieldRef<"User", 'BigInt'>
+    readonly guestId: FieldRef<"User", 'String'>
+    readonly isGuest: FieldRef<"User", 'Boolean'>
     readonly username: FieldRef<"User", 'String'>
     readonly firstname: FieldRef<"User", 'String'>
     readonly lastname: FieldRef<"User", 'String'>
@@ -2157,7 +2183,7 @@ export namespace Prisma {
     /**
      * The data needed to create a User.
      */
-    data: XOR<UserCreateInput, UserUncheckedCreateInput>
+    data?: XOR<UserCreateInput, UserUncheckedCreateInput>
   }
 
   /**
@@ -6002,6 +6028,8 @@ export namespace Prisma {
   export const UserScalarFieldEnum: {
     id: 'id',
     stravaAthleteId: 'stravaAthleteId',
+    guestId: 'guestId',
+    isGuest: 'isGuest',
     username: 'username',
     firstname: 'firstname',
     lastname: 'lastname',
@@ -6126,6 +6154,13 @@ export namespace Prisma {
 
 
   /**
+   * Reference to a field of type 'Boolean'
+   */
+  export type BooleanFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Boolean'>
+    
+
+
+  /**
    * Reference to a field of type 'DateTime'
    */
   export type DateTimeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'DateTime'>
@@ -6151,13 +6186,6 @@ export namespace Prisma {
    */
   export type ListFloatFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Float[]'>
     
-
-
-  /**
-   * Reference to a field of type 'Boolean'
-   */
-  export type BooleanFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Boolean'>
-    
   /**
    * Deep Input Types
    */
@@ -6168,7 +6196,9 @@ export namespace Prisma {
     OR?: UserWhereInput[]
     NOT?: UserWhereInput | UserWhereInput[]
     id?: IntFilter<"User"> | number
-    stravaAthleteId?: BigIntFilter<"User"> | bigint | number
+    stravaAthleteId?: BigIntNullableFilter<"User"> | bigint | number | null
+    guestId?: StringNullableFilter<"User"> | string | null
+    isGuest?: BoolFilter<"User"> | boolean
     username?: StringNullableFilter<"User"> | string | null
     firstname?: StringNullableFilter<"User"> | string | null
     lastname?: StringNullableFilter<"User"> | string | null
@@ -6182,7 +6212,9 @@ export namespace Prisma {
 
   export type UserOrderByWithRelationInput = {
     id?: SortOrder
-    stravaAthleteId?: SortOrder
+    stravaAthleteId?: SortOrderInput | SortOrder
+    guestId?: SortOrderInput | SortOrder
+    isGuest?: SortOrder
     username?: SortOrderInput | SortOrder
     firstname?: SortOrderInput | SortOrder
     lastname?: SortOrderInput | SortOrder
@@ -6197,9 +6229,11 @@ export namespace Prisma {
   export type UserWhereUniqueInput = Prisma.AtLeast<{
     id?: number
     stravaAthleteId?: bigint | number
+    guestId?: string
     AND?: UserWhereInput | UserWhereInput[]
     OR?: UserWhereInput[]
     NOT?: UserWhereInput | UserWhereInput[]
+    isGuest?: BoolFilter<"User"> | boolean
     username?: StringNullableFilter<"User"> | string | null
     firstname?: StringNullableFilter<"User"> | string | null
     lastname?: StringNullableFilter<"User"> | string | null
@@ -6209,11 +6243,13 @@ export namespace Prisma {
     tiles?: TileOwnershipListRelationFilter
     historyCaptured?: TileHistoryListRelationFilter
     historyLost?: TileHistoryListRelationFilter
-  }, "id" | "stravaAthleteId">
+  }, "id" | "stravaAthleteId" | "guestId">
 
   export type UserOrderByWithAggregationInput = {
     id?: SortOrder
-    stravaAthleteId?: SortOrder
+    stravaAthleteId?: SortOrderInput | SortOrder
+    guestId?: SortOrderInput | SortOrder
+    isGuest?: SortOrder
     username?: SortOrderInput | SortOrder
     firstname?: SortOrderInput | SortOrder
     lastname?: SortOrderInput | SortOrder
@@ -6231,7 +6267,9 @@ export namespace Prisma {
     OR?: UserScalarWhereWithAggregatesInput[]
     NOT?: UserScalarWhereWithAggregatesInput | UserScalarWhereWithAggregatesInput[]
     id?: IntWithAggregatesFilter<"User"> | number
-    stravaAthleteId?: BigIntWithAggregatesFilter<"User"> | bigint | number
+    stravaAthleteId?: BigIntNullableWithAggregatesFilter<"User"> | bigint | number | null
+    guestId?: StringNullableWithAggregatesFilter<"User"> | string | null
+    isGuest?: BoolWithAggregatesFilter<"User"> | boolean
     username?: StringNullableWithAggregatesFilter<"User"> | string | null
     firstname?: StringNullableWithAggregatesFilter<"User"> | string | null
     lastname?: StringNullableWithAggregatesFilter<"User"> | string | null
@@ -6465,7 +6503,9 @@ export namespace Prisma {
   }
 
   export type UserCreateInput = {
-    stravaAthleteId: bigint | number
+    stravaAthleteId?: bigint | number | null
+    guestId?: string | null
+    isGuest?: boolean
     username?: string | null
     firstname?: string | null
     lastname?: string | null
@@ -6479,7 +6519,9 @@ export namespace Prisma {
 
   export type UserUncheckedCreateInput = {
     id?: number
-    stravaAthleteId: bigint | number
+    stravaAthleteId?: bigint | number | null
+    guestId?: string | null
+    isGuest?: boolean
     username?: string | null
     firstname?: string | null
     lastname?: string | null
@@ -6492,7 +6534,9 @@ export namespace Prisma {
   }
 
   export type UserUpdateInput = {
-    stravaAthleteId?: BigIntFieldUpdateOperationsInput | bigint | number
+    stravaAthleteId?: NullableBigIntFieldUpdateOperationsInput | bigint | number | null
+    guestId?: NullableStringFieldUpdateOperationsInput | string | null
+    isGuest?: BoolFieldUpdateOperationsInput | boolean
     username?: NullableStringFieldUpdateOperationsInput | string | null
     firstname?: NullableStringFieldUpdateOperationsInput | string | null
     lastname?: NullableStringFieldUpdateOperationsInput | string | null
@@ -6506,7 +6550,9 @@ export namespace Prisma {
 
   export type UserUncheckedUpdateInput = {
     id?: IntFieldUpdateOperationsInput | number
-    stravaAthleteId?: BigIntFieldUpdateOperationsInput | bigint | number
+    stravaAthleteId?: NullableBigIntFieldUpdateOperationsInput | bigint | number | null
+    guestId?: NullableStringFieldUpdateOperationsInput | string | null
+    isGuest?: BoolFieldUpdateOperationsInput | boolean
     username?: NullableStringFieldUpdateOperationsInput | string | null
     firstname?: NullableStringFieldUpdateOperationsInput | string | null
     lastname?: NullableStringFieldUpdateOperationsInput | string | null
@@ -6520,7 +6566,9 @@ export namespace Prisma {
 
   export type UserCreateManyInput = {
     id?: number
-    stravaAthleteId: bigint | number
+    stravaAthleteId?: bigint | number | null
+    guestId?: string | null
+    isGuest?: boolean
     username?: string | null
     firstname?: string | null
     lastname?: string | null
@@ -6529,7 +6577,9 @@ export namespace Prisma {
   }
 
   export type UserUpdateManyMutationInput = {
-    stravaAthleteId?: BigIntFieldUpdateOperationsInput | bigint | number
+    stravaAthleteId?: NullableBigIntFieldUpdateOperationsInput | bigint | number | null
+    guestId?: NullableStringFieldUpdateOperationsInput | string | null
+    isGuest?: BoolFieldUpdateOperationsInput | boolean
     username?: NullableStringFieldUpdateOperationsInput | string | null
     firstname?: NullableStringFieldUpdateOperationsInput | string | null
     lastname?: NullableStringFieldUpdateOperationsInput | string | null
@@ -6539,7 +6589,9 @@ export namespace Prisma {
 
   export type UserUncheckedUpdateManyInput = {
     id?: IntFieldUpdateOperationsInput | number
-    stravaAthleteId?: BigIntFieldUpdateOperationsInput | bigint | number
+    stravaAthleteId?: NullableBigIntFieldUpdateOperationsInput | bigint | number | null
+    guestId?: NullableStringFieldUpdateOperationsInput | string | null
+    isGuest?: BoolFieldUpdateOperationsInput | boolean
     username?: NullableStringFieldUpdateOperationsInput | string | null
     firstname?: NullableStringFieldUpdateOperationsInput | string | null
     lastname?: NullableStringFieldUpdateOperationsInput | string | null
@@ -6779,15 +6831,15 @@ export namespace Prisma {
     not?: NestedIntFilter<$PrismaModel> | number
   }
 
-  export type BigIntFilter<$PrismaModel = never> = {
-    equals?: bigint | number | BigIntFieldRefInput<$PrismaModel>
-    in?: bigint[] | number[] | ListBigIntFieldRefInput<$PrismaModel>
-    notIn?: bigint[] | number[] | ListBigIntFieldRefInput<$PrismaModel>
+  export type BigIntNullableFilter<$PrismaModel = never> = {
+    equals?: bigint | number | BigIntFieldRefInput<$PrismaModel> | null
+    in?: bigint[] | number[] | ListBigIntFieldRefInput<$PrismaModel> | null
+    notIn?: bigint[] | number[] | ListBigIntFieldRefInput<$PrismaModel> | null
     lt?: bigint | number | BigIntFieldRefInput<$PrismaModel>
     lte?: bigint | number | BigIntFieldRefInput<$PrismaModel>
     gt?: bigint | number | BigIntFieldRefInput<$PrismaModel>
     gte?: bigint | number | BigIntFieldRefInput<$PrismaModel>
-    not?: NestedBigIntFilter<$PrismaModel> | bigint | number
+    not?: NestedBigIntNullableFilter<$PrismaModel> | bigint | number | null
   }
 
   export type StringNullableFilter<$PrismaModel = never> = {
@@ -6803,6 +6855,11 @@ export namespace Prisma {
     endsWith?: string | StringFieldRefInput<$PrismaModel>
     mode?: QueryMode
     not?: NestedStringNullableFilter<$PrismaModel> | string | null
+  }
+
+  export type BoolFilter<$PrismaModel = never> = {
+    equals?: boolean | BooleanFieldRefInput<$PrismaModel>
+    not?: NestedBoolFilter<$PrismaModel> | boolean
   }
 
   export type DateTimeFilter<$PrismaModel = never> = {
@@ -6854,6 +6911,8 @@ export namespace Prisma {
   export type UserCountOrderByAggregateInput = {
     id?: SortOrder
     stravaAthleteId?: SortOrder
+    guestId?: SortOrder
+    isGuest?: SortOrder
     username?: SortOrder
     firstname?: SortOrder
     lastname?: SortOrder
@@ -6869,6 +6928,8 @@ export namespace Prisma {
   export type UserMaxOrderByAggregateInput = {
     id?: SortOrder
     stravaAthleteId?: SortOrder
+    guestId?: SortOrder
+    isGuest?: SortOrder
     username?: SortOrder
     firstname?: SortOrder
     lastname?: SortOrder
@@ -6879,6 +6940,8 @@ export namespace Prisma {
   export type UserMinOrderByAggregateInput = {
     id?: SortOrder
     stravaAthleteId?: SortOrder
+    guestId?: SortOrder
+    isGuest?: SortOrder
     username?: SortOrder
     firstname?: SortOrder
     lastname?: SortOrder
@@ -6907,20 +6970,20 @@ export namespace Prisma {
     _max?: NestedIntFilter<$PrismaModel>
   }
 
-  export type BigIntWithAggregatesFilter<$PrismaModel = never> = {
-    equals?: bigint | number | BigIntFieldRefInput<$PrismaModel>
-    in?: bigint[] | number[] | ListBigIntFieldRefInput<$PrismaModel>
-    notIn?: bigint[] | number[] | ListBigIntFieldRefInput<$PrismaModel>
+  export type BigIntNullableWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: bigint | number | BigIntFieldRefInput<$PrismaModel> | null
+    in?: bigint[] | number[] | ListBigIntFieldRefInput<$PrismaModel> | null
+    notIn?: bigint[] | number[] | ListBigIntFieldRefInput<$PrismaModel> | null
     lt?: bigint | number | BigIntFieldRefInput<$PrismaModel>
     lte?: bigint | number | BigIntFieldRefInput<$PrismaModel>
     gt?: bigint | number | BigIntFieldRefInput<$PrismaModel>
     gte?: bigint | number | BigIntFieldRefInput<$PrismaModel>
-    not?: NestedBigIntWithAggregatesFilter<$PrismaModel> | bigint | number
-    _count?: NestedIntFilter<$PrismaModel>
-    _avg?: NestedFloatFilter<$PrismaModel>
-    _sum?: NestedBigIntFilter<$PrismaModel>
-    _min?: NestedBigIntFilter<$PrismaModel>
-    _max?: NestedBigIntFilter<$PrismaModel>
+    not?: NestedBigIntNullableWithAggregatesFilter<$PrismaModel> | bigint | number | null
+    _count?: NestedIntNullableFilter<$PrismaModel>
+    _avg?: NestedFloatNullableFilter<$PrismaModel>
+    _sum?: NestedBigIntNullableFilter<$PrismaModel>
+    _min?: NestedBigIntNullableFilter<$PrismaModel>
+    _max?: NestedBigIntNullableFilter<$PrismaModel>
   }
 
   export type StringNullableWithAggregatesFilter<$PrismaModel = never> = {
@@ -6941,6 +7004,14 @@ export namespace Prisma {
     _max?: NestedStringNullableFilter<$PrismaModel>
   }
 
+  export type BoolWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: boolean | BooleanFieldRefInput<$PrismaModel>
+    not?: NestedBoolWithAggregatesFilter<$PrismaModel> | boolean
+    _count?: NestedIntFilter<$PrismaModel>
+    _min?: NestedBoolFilter<$PrismaModel>
+    _max?: NestedBoolFilter<$PrismaModel>
+  }
+
   export type DateTimeWithAggregatesFilter<$PrismaModel = never> = {
     equals?: Date | string | DateTimeFieldRefInput<$PrismaModel>
     in?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel>
@@ -6953,17 +7024,6 @@ export namespace Prisma {
     _count?: NestedIntFilter<$PrismaModel>
     _min?: NestedDateTimeFilter<$PrismaModel>
     _max?: NestedDateTimeFilter<$PrismaModel>
-  }
-
-  export type BigIntNullableFilter<$PrismaModel = never> = {
-    equals?: bigint | number | BigIntFieldRefInput<$PrismaModel> | null
-    in?: bigint[] | number[] | ListBigIntFieldRefInput<$PrismaModel> | null
-    notIn?: bigint[] | number[] | ListBigIntFieldRefInput<$PrismaModel> | null
-    lt?: bigint | number | BigIntFieldRefInput<$PrismaModel>
-    lte?: bigint | number | BigIntFieldRefInput<$PrismaModel>
-    gt?: bigint | number | BigIntFieldRefInput<$PrismaModel>
-    gte?: bigint | number | BigIntFieldRefInput<$PrismaModel>
-    not?: NestedBigIntNullableFilter<$PrismaModel> | bigint | number | null
   }
 
   export type StringFilter<$PrismaModel = never> = {
@@ -7001,11 +7061,6 @@ export namespace Prisma {
     gt?: number | IntFieldRefInput<$PrismaModel>
     gte?: number | IntFieldRefInput<$PrismaModel>
     not?: NestedIntNullableFilter<$PrismaModel> | number | null
-  }
-
-  export type BoolFilter<$PrismaModel = never> = {
-    equals?: boolean | BooleanFieldRefInput<$PrismaModel>
-    not?: NestedBoolFilter<$PrismaModel> | boolean
   }
 
   export type UserScalarRelationFilter = {
@@ -7088,22 +7143,6 @@ export namespace Prisma {
     endLng?: SortOrder
   }
 
-  export type BigIntNullableWithAggregatesFilter<$PrismaModel = never> = {
-    equals?: bigint | number | BigIntFieldRefInput<$PrismaModel> | null
-    in?: bigint[] | number[] | ListBigIntFieldRefInput<$PrismaModel> | null
-    notIn?: bigint[] | number[] | ListBigIntFieldRefInput<$PrismaModel> | null
-    lt?: bigint | number | BigIntFieldRefInput<$PrismaModel>
-    lte?: bigint | number | BigIntFieldRefInput<$PrismaModel>
-    gt?: bigint | number | BigIntFieldRefInput<$PrismaModel>
-    gte?: bigint | number | BigIntFieldRefInput<$PrismaModel>
-    not?: NestedBigIntNullableWithAggregatesFilter<$PrismaModel> | bigint | number | null
-    _count?: NestedIntNullableFilter<$PrismaModel>
-    _avg?: NestedFloatNullableFilter<$PrismaModel>
-    _sum?: NestedBigIntNullableFilter<$PrismaModel>
-    _min?: NestedBigIntNullableFilter<$PrismaModel>
-    _max?: NestedBigIntNullableFilter<$PrismaModel>
-  }
-
   export type StringWithAggregatesFilter<$PrismaModel = never> = {
     equals?: string | StringFieldRefInput<$PrismaModel>
     in?: string[] | ListStringFieldRefInput<$PrismaModel>
@@ -7152,14 +7191,6 @@ export namespace Prisma {
     _sum?: NestedIntNullableFilter<$PrismaModel>
     _min?: NestedIntNullableFilter<$PrismaModel>
     _max?: NestedIntNullableFilter<$PrismaModel>
-  }
-
-  export type BoolWithAggregatesFilter<$PrismaModel = never> = {
-    equals?: boolean | BooleanFieldRefInput<$PrismaModel>
-    not?: NestedBoolWithAggregatesFilter<$PrismaModel> | boolean
-    _count?: NestedIntFilter<$PrismaModel>
-    _min?: NestedBoolFilter<$PrismaModel>
-    _max?: NestedBoolFilter<$PrismaModel>
   }
 
   export type TileOwnershipCountOrderByAggregateInput = {
@@ -7300,8 +7331,8 @@ export namespace Prisma {
     connect?: TileHistoryWhereUniqueInput | TileHistoryWhereUniqueInput[]
   }
 
-  export type BigIntFieldUpdateOperationsInput = {
-    set?: bigint | number
+  export type NullableBigIntFieldUpdateOperationsInput = {
+    set?: bigint | number | null
     increment?: bigint | number
     decrement?: bigint | number
     multiply?: bigint | number
@@ -7310,6 +7341,10 @@ export namespace Prisma {
 
   export type NullableStringFieldUpdateOperationsInput = {
     set?: string | null
+  }
+
+  export type BoolFieldUpdateOperationsInput = {
+    set?: boolean
   }
 
   export type DateTimeFieldUpdateOperationsInput = {
@@ -7456,14 +7491,6 @@ export namespace Prisma {
     connect?: TileHistoryWhereUniqueInput | TileHistoryWhereUniqueInput[]
   }
 
-  export type NullableBigIntFieldUpdateOperationsInput = {
-    set?: bigint | number | null
-    increment?: bigint | number
-    decrement?: bigint | number
-    multiply?: bigint | number
-    divide?: bigint | number
-  }
-
   export type StringFieldUpdateOperationsInput = {
     set?: string
   }
@@ -7482,10 +7509,6 @@ export namespace Prisma {
     decrement?: number
     multiply?: number
     divide?: number
-  }
-
-  export type BoolFieldUpdateOperationsInput = {
-    set?: boolean
   }
 
   export type UserUpdateOneRequiredWithoutActivitiesNestedInput = {
@@ -7597,15 +7620,15 @@ export namespace Prisma {
     not?: NestedIntFilter<$PrismaModel> | number
   }
 
-  export type NestedBigIntFilter<$PrismaModel = never> = {
-    equals?: bigint | number | BigIntFieldRefInput<$PrismaModel>
-    in?: bigint[] | number[] | ListBigIntFieldRefInput<$PrismaModel>
-    notIn?: bigint[] | number[] | ListBigIntFieldRefInput<$PrismaModel>
+  export type NestedBigIntNullableFilter<$PrismaModel = never> = {
+    equals?: bigint | number | BigIntFieldRefInput<$PrismaModel> | null
+    in?: bigint[] | number[] | ListBigIntFieldRefInput<$PrismaModel> | null
+    notIn?: bigint[] | number[] | ListBigIntFieldRefInput<$PrismaModel> | null
     lt?: bigint | number | BigIntFieldRefInput<$PrismaModel>
     lte?: bigint | number | BigIntFieldRefInput<$PrismaModel>
     gt?: bigint | number | BigIntFieldRefInput<$PrismaModel>
     gte?: bigint | number | BigIntFieldRefInput<$PrismaModel>
-    not?: NestedBigIntFilter<$PrismaModel> | bigint | number
+    not?: NestedBigIntNullableFilter<$PrismaModel> | bigint | number | null
   }
 
   export type NestedStringNullableFilter<$PrismaModel = never> = {
@@ -7620,6 +7643,11 @@ export namespace Prisma {
     startsWith?: string | StringFieldRefInput<$PrismaModel>
     endsWith?: string | StringFieldRefInput<$PrismaModel>
     not?: NestedStringNullableFilter<$PrismaModel> | string | null
+  }
+
+  export type NestedBoolFilter<$PrismaModel = never> = {
+    equals?: boolean | BooleanFieldRefInput<$PrismaModel>
+    not?: NestedBoolFilter<$PrismaModel> | boolean
   }
 
   export type NestedDateTimeFilter<$PrismaModel = never> = {
@@ -7660,20 +7688,42 @@ export namespace Prisma {
     not?: NestedFloatFilter<$PrismaModel> | number
   }
 
-  export type NestedBigIntWithAggregatesFilter<$PrismaModel = never> = {
-    equals?: bigint | number | BigIntFieldRefInput<$PrismaModel>
-    in?: bigint[] | number[] | ListBigIntFieldRefInput<$PrismaModel>
-    notIn?: bigint[] | number[] | ListBigIntFieldRefInput<$PrismaModel>
+  export type NestedBigIntNullableWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: bigint | number | BigIntFieldRefInput<$PrismaModel> | null
+    in?: bigint[] | number[] | ListBigIntFieldRefInput<$PrismaModel> | null
+    notIn?: bigint[] | number[] | ListBigIntFieldRefInput<$PrismaModel> | null
     lt?: bigint | number | BigIntFieldRefInput<$PrismaModel>
     lte?: bigint | number | BigIntFieldRefInput<$PrismaModel>
     gt?: bigint | number | BigIntFieldRefInput<$PrismaModel>
     gte?: bigint | number | BigIntFieldRefInput<$PrismaModel>
-    not?: NestedBigIntWithAggregatesFilter<$PrismaModel> | bigint | number
-    _count?: NestedIntFilter<$PrismaModel>
-    _avg?: NestedFloatFilter<$PrismaModel>
-    _sum?: NestedBigIntFilter<$PrismaModel>
-    _min?: NestedBigIntFilter<$PrismaModel>
-    _max?: NestedBigIntFilter<$PrismaModel>
+    not?: NestedBigIntNullableWithAggregatesFilter<$PrismaModel> | bigint | number | null
+    _count?: NestedIntNullableFilter<$PrismaModel>
+    _avg?: NestedFloatNullableFilter<$PrismaModel>
+    _sum?: NestedBigIntNullableFilter<$PrismaModel>
+    _min?: NestedBigIntNullableFilter<$PrismaModel>
+    _max?: NestedBigIntNullableFilter<$PrismaModel>
+  }
+
+  export type NestedIntNullableFilter<$PrismaModel = never> = {
+    equals?: number | IntFieldRefInput<$PrismaModel> | null
+    in?: number[] | ListIntFieldRefInput<$PrismaModel> | null
+    notIn?: number[] | ListIntFieldRefInput<$PrismaModel> | null
+    lt?: number | IntFieldRefInput<$PrismaModel>
+    lte?: number | IntFieldRefInput<$PrismaModel>
+    gt?: number | IntFieldRefInput<$PrismaModel>
+    gte?: number | IntFieldRefInput<$PrismaModel>
+    not?: NestedIntNullableFilter<$PrismaModel> | number | null
+  }
+
+  export type NestedFloatNullableFilter<$PrismaModel = never> = {
+    equals?: number | FloatFieldRefInput<$PrismaModel> | null
+    in?: number[] | ListFloatFieldRefInput<$PrismaModel> | null
+    notIn?: number[] | ListFloatFieldRefInput<$PrismaModel> | null
+    lt?: number | FloatFieldRefInput<$PrismaModel>
+    lte?: number | FloatFieldRefInput<$PrismaModel>
+    gt?: number | FloatFieldRefInput<$PrismaModel>
+    gte?: number | FloatFieldRefInput<$PrismaModel>
+    not?: NestedFloatNullableFilter<$PrismaModel> | number | null
   }
 
   export type NestedStringNullableWithAggregatesFilter<$PrismaModel = never> = {
@@ -7693,15 +7743,12 @@ export namespace Prisma {
     _max?: NestedStringNullableFilter<$PrismaModel>
   }
 
-  export type NestedIntNullableFilter<$PrismaModel = never> = {
-    equals?: number | IntFieldRefInput<$PrismaModel> | null
-    in?: number[] | ListIntFieldRefInput<$PrismaModel> | null
-    notIn?: number[] | ListIntFieldRefInput<$PrismaModel> | null
-    lt?: number | IntFieldRefInput<$PrismaModel>
-    lte?: number | IntFieldRefInput<$PrismaModel>
-    gt?: number | IntFieldRefInput<$PrismaModel>
-    gte?: number | IntFieldRefInput<$PrismaModel>
-    not?: NestedIntNullableFilter<$PrismaModel> | number | null
+  export type NestedBoolWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: boolean | BooleanFieldRefInput<$PrismaModel>
+    not?: NestedBoolWithAggregatesFilter<$PrismaModel> | boolean
+    _count?: NestedIntFilter<$PrismaModel>
+    _min?: NestedBoolFilter<$PrismaModel>
+    _max?: NestedBoolFilter<$PrismaModel>
   }
 
   export type NestedDateTimeWithAggregatesFilter<$PrismaModel = never> = {
@@ -7718,17 +7765,6 @@ export namespace Prisma {
     _max?: NestedDateTimeFilter<$PrismaModel>
   }
 
-  export type NestedBigIntNullableFilter<$PrismaModel = never> = {
-    equals?: bigint | number | BigIntFieldRefInput<$PrismaModel> | null
-    in?: bigint[] | number[] | ListBigIntFieldRefInput<$PrismaModel> | null
-    notIn?: bigint[] | number[] | ListBigIntFieldRefInput<$PrismaModel> | null
-    lt?: bigint | number | BigIntFieldRefInput<$PrismaModel>
-    lte?: bigint | number | BigIntFieldRefInput<$PrismaModel>
-    gt?: bigint | number | BigIntFieldRefInput<$PrismaModel>
-    gte?: bigint | number | BigIntFieldRefInput<$PrismaModel>
-    not?: NestedBigIntNullableFilter<$PrismaModel> | bigint | number | null
-  }
-
   export type NestedStringFilter<$PrismaModel = never> = {
     equals?: string | StringFieldRefInput<$PrismaModel>
     in?: string[] | ListStringFieldRefInput<$PrismaModel>
@@ -7741,38 +7777,6 @@ export namespace Prisma {
     startsWith?: string | StringFieldRefInput<$PrismaModel>
     endsWith?: string | StringFieldRefInput<$PrismaModel>
     not?: NestedStringFilter<$PrismaModel> | string
-  }
-
-  export type NestedFloatNullableFilter<$PrismaModel = never> = {
-    equals?: number | FloatFieldRefInput<$PrismaModel> | null
-    in?: number[] | ListFloatFieldRefInput<$PrismaModel> | null
-    notIn?: number[] | ListFloatFieldRefInput<$PrismaModel> | null
-    lt?: number | FloatFieldRefInput<$PrismaModel>
-    lte?: number | FloatFieldRefInput<$PrismaModel>
-    gt?: number | FloatFieldRefInput<$PrismaModel>
-    gte?: number | FloatFieldRefInput<$PrismaModel>
-    not?: NestedFloatNullableFilter<$PrismaModel> | number | null
-  }
-
-  export type NestedBoolFilter<$PrismaModel = never> = {
-    equals?: boolean | BooleanFieldRefInput<$PrismaModel>
-    not?: NestedBoolFilter<$PrismaModel> | boolean
-  }
-
-  export type NestedBigIntNullableWithAggregatesFilter<$PrismaModel = never> = {
-    equals?: bigint | number | BigIntFieldRefInput<$PrismaModel> | null
-    in?: bigint[] | number[] | ListBigIntFieldRefInput<$PrismaModel> | null
-    notIn?: bigint[] | number[] | ListBigIntFieldRefInput<$PrismaModel> | null
-    lt?: bigint | number | BigIntFieldRefInput<$PrismaModel>
-    lte?: bigint | number | BigIntFieldRefInput<$PrismaModel>
-    gt?: bigint | number | BigIntFieldRefInput<$PrismaModel>
-    gte?: bigint | number | BigIntFieldRefInput<$PrismaModel>
-    not?: NestedBigIntNullableWithAggregatesFilter<$PrismaModel> | bigint | number | null
-    _count?: NestedIntNullableFilter<$PrismaModel>
-    _avg?: NestedFloatNullableFilter<$PrismaModel>
-    _sum?: NestedBigIntNullableFilter<$PrismaModel>
-    _min?: NestedBigIntNullableFilter<$PrismaModel>
-    _max?: NestedBigIntNullableFilter<$PrismaModel>
   }
 
   export type NestedStringWithAggregatesFilter<$PrismaModel = never> = {
@@ -7822,14 +7826,6 @@ export namespace Prisma {
     _sum?: NestedIntNullableFilter<$PrismaModel>
     _min?: NestedIntNullableFilter<$PrismaModel>
     _max?: NestedIntNullableFilter<$PrismaModel>
-  }
-
-  export type NestedBoolWithAggregatesFilter<$PrismaModel = never> = {
-    equals?: boolean | BooleanFieldRefInput<$PrismaModel>
-    not?: NestedBoolWithAggregatesFilter<$PrismaModel> | boolean
-    _count?: NestedIntFilter<$PrismaModel>
-    _min?: NestedBoolFilter<$PrismaModel>
-    _max?: NestedBoolFilter<$PrismaModel>
   }
 
   export type ActivityCreateWithoutUserInput = {
@@ -8053,7 +8049,9 @@ export namespace Prisma {
   }
 
   export type UserCreateWithoutActivitiesInput = {
-    stravaAthleteId: bigint | number
+    stravaAthleteId?: bigint | number | null
+    guestId?: string | null
+    isGuest?: boolean
     username?: string | null
     firstname?: string | null
     lastname?: string | null
@@ -8066,7 +8064,9 @@ export namespace Prisma {
 
   export type UserUncheckedCreateWithoutActivitiesInput = {
     id?: number
-    stravaAthleteId: bigint | number
+    stravaAthleteId?: bigint | number | null
+    guestId?: string | null
+    isGuest?: boolean
     username?: string | null
     firstname?: string | null
     lastname?: string | null
@@ -8119,7 +8119,9 @@ export namespace Prisma {
   }
 
   export type UserUpdateWithoutActivitiesInput = {
-    stravaAthleteId?: BigIntFieldUpdateOperationsInput | bigint | number
+    stravaAthleteId?: NullableBigIntFieldUpdateOperationsInput | bigint | number | null
+    guestId?: NullableStringFieldUpdateOperationsInput | string | null
+    isGuest?: BoolFieldUpdateOperationsInput | boolean
     username?: NullableStringFieldUpdateOperationsInput | string | null
     firstname?: NullableStringFieldUpdateOperationsInput | string | null
     lastname?: NullableStringFieldUpdateOperationsInput | string | null
@@ -8132,7 +8134,9 @@ export namespace Prisma {
 
   export type UserUncheckedUpdateWithoutActivitiesInput = {
     id?: IntFieldUpdateOperationsInput | number
-    stravaAthleteId?: BigIntFieldUpdateOperationsInput | bigint | number
+    stravaAthleteId?: NullableBigIntFieldUpdateOperationsInput | bigint | number | null
+    guestId?: NullableStringFieldUpdateOperationsInput | string | null
+    isGuest?: BoolFieldUpdateOperationsInput | boolean
     username?: NullableStringFieldUpdateOperationsInput | string | null
     firstname?: NullableStringFieldUpdateOperationsInput | string | null
     lastname?: NullableStringFieldUpdateOperationsInput | string | null
@@ -8160,7 +8164,9 @@ export namespace Prisma {
   }
 
   export type UserCreateWithoutTilesInput = {
-    stravaAthleteId: bigint | number
+    stravaAthleteId?: bigint | number | null
+    guestId?: string | null
+    isGuest?: boolean
     username?: string | null
     firstname?: string | null
     lastname?: string | null
@@ -8173,7 +8179,9 @@ export namespace Prisma {
 
   export type UserUncheckedCreateWithoutTilesInput = {
     id?: number
-    stravaAthleteId: bigint | number
+    stravaAthleteId?: bigint | number | null
+    guestId?: string | null
+    isGuest?: boolean
     username?: string | null
     firstname?: string | null
     lastname?: string | null
@@ -8201,7 +8209,9 @@ export namespace Prisma {
   }
 
   export type UserUpdateWithoutTilesInput = {
-    stravaAthleteId?: BigIntFieldUpdateOperationsInput | bigint | number
+    stravaAthleteId?: NullableBigIntFieldUpdateOperationsInput | bigint | number | null
+    guestId?: NullableStringFieldUpdateOperationsInput | string | null
+    isGuest?: BoolFieldUpdateOperationsInput | boolean
     username?: NullableStringFieldUpdateOperationsInput | string | null
     firstname?: NullableStringFieldUpdateOperationsInput | string | null
     lastname?: NullableStringFieldUpdateOperationsInput | string | null
@@ -8214,7 +8224,9 @@ export namespace Prisma {
 
   export type UserUncheckedUpdateWithoutTilesInput = {
     id?: IntFieldUpdateOperationsInput | number
-    stravaAthleteId?: BigIntFieldUpdateOperationsInput | bigint | number
+    stravaAthleteId?: NullableBigIntFieldUpdateOperationsInput | bigint | number | null
+    guestId?: NullableStringFieldUpdateOperationsInput | string | null
+    isGuest?: BoolFieldUpdateOperationsInput | boolean
     username?: NullableStringFieldUpdateOperationsInput | string | null
     firstname?: NullableStringFieldUpdateOperationsInput | string | null
     lastname?: NullableStringFieldUpdateOperationsInput | string | null
@@ -8226,7 +8238,9 @@ export namespace Prisma {
   }
 
   export type UserCreateWithoutHistoryCapturedInput = {
-    stravaAthleteId: bigint | number
+    stravaAthleteId?: bigint | number | null
+    guestId?: string | null
+    isGuest?: boolean
     username?: string | null
     firstname?: string | null
     lastname?: string | null
@@ -8239,7 +8253,9 @@ export namespace Prisma {
 
   export type UserUncheckedCreateWithoutHistoryCapturedInput = {
     id?: number
-    stravaAthleteId: bigint | number
+    stravaAthleteId?: bigint | number | null
+    guestId?: string | null
+    isGuest?: boolean
     username?: string | null
     firstname?: string | null
     lastname?: string | null
@@ -8256,7 +8272,9 @@ export namespace Prisma {
   }
 
   export type UserCreateWithoutHistoryLostInput = {
-    stravaAthleteId: bigint | number
+    stravaAthleteId?: bigint | number | null
+    guestId?: string | null
+    isGuest?: boolean
     username?: string | null
     firstname?: string | null
     lastname?: string | null
@@ -8269,7 +8287,9 @@ export namespace Prisma {
 
   export type UserUncheckedCreateWithoutHistoryLostInput = {
     id?: number
-    stravaAthleteId: bigint | number
+    stravaAthleteId?: bigint | number | null
+    guestId?: string | null
+    isGuest?: boolean
     username?: string | null
     firstname?: string | null
     lastname?: string | null
@@ -8335,7 +8355,9 @@ export namespace Prisma {
   }
 
   export type UserUpdateWithoutHistoryCapturedInput = {
-    stravaAthleteId?: BigIntFieldUpdateOperationsInput | bigint | number
+    stravaAthleteId?: NullableBigIntFieldUpdateOperationsInput | bigint | number | null
+    guestId?: NullableStringFieldUpdateOperationsInput | string | null
+    isGuest?: BoolFieldUpdateOperationsInput | boolean
     username?: NullableStringFieldUpdateOperationsInput | string | null
     firstname?: NullableStringFieldUpdateOperationsInput | string | null
     lastname?: NullableStringFieldUpdateOperationsInput | string | null
@@ -8348,7 +8370,9 @@ export namespace Prisma {
 
   export type UserUncheckedUpdateWithoutHistoryCapturedInput = {
     id?: IntFieldUpdateOperationsInput | number
-    stravaAthleteId?: BigIntFieldUpdateOperationsInput | bigint | number
+    stravaAthleteId?: NullableBigIntFieldUpdateOperationsInput | bigint | number | null
+    guestId?: NullableStringFieldUpdateOperationsInput | string | null
+    isGuest?: BoolFieldUpdateOperationsInput | boolean
     username?: NullableStringFieldUpdateOperationsInput | string | null
     firstname?: NullableStringFieldUpdateOperationsInput | string | null
     lastname?: NullableStringFieldUpdateOperationsInput | string | null
@@ -8371,7 +8395,9 @@ export namespace Prisma {
   }
 
   export type UserUpdateWithoutHistoryLostInput = {
-    stravaAthleteId?: BigIntFieldUpdateOperationsInput | bigint | number
+    stravaAthleteId?: NullableBigIntFieldUpdateOperationsInput | bigint | number | null
+    guestId?: NullableStringFieldUpdateOperationsInput | string | null
+    isGuest?: BoolFieldUpdateOperationsInput | boolean
     username?: NullableStringFieldUpdateOperationsInput | string | null
     firstname?: NullableStringFieldUpdateOperationsInput | string | null
     lastname?: NullableStringFieldUpdateOperationsInput | string | null
@@ -8384,7 +8410,9 @@ export namespace Prisma {
 
   export type UserUncheckedUpdateWithoutHistoryLostInput = {
     id?: IntFieldUpdateOperationsInput | number
-    stravaAthleteId?: BigIntFieldUpdateOperationsInput | bigint | number
+    stravaAthleteId?: NullableBigIntFieldUpdateOperationsInput | bigint | number | null
+    guestId?: NullableStringFieldUpdateOperationsInput | string | null
+    isGuest?: BoolFieldUpdateOperationsInput | boolean
     username?: NullableStringFieldUpdateOperationsInput | string | null
     firstname?: NullableStringFieldUpdateOperationsInput | string | null
     lastname?: NullableStringFieldUpdateOperationsInput | string | null

@@ -10,7 +10,9 @@ datasource db {
 
 model User {
   id              Int      @id @default(autoincrement())
-  stravaAthleteId BigInt   @unique
+  stravaAthleteId BigInt?  @unique  // nullable: guest users don't have Strava IDs
+  guestId         String?  @unique  // UUID for anonymous/guest users
+  isGuest         Boolean  @default(false)
   username        String?
   firstname       String?
   lastname        String?
