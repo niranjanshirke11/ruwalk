@@ -2,6 +2,9 @@ import { useEffect, useState, useCallback } from "react";
 import TerritoryMap from "./components/TerritoryMap";
 import LiveTrackingMap from "./components/LiveTrackingMap";
 import Leaderboard from "./components/Leaderboard";
+import Profile from "./components/Profile";
+import BottomNav from "./components/BottomNav";
+import UsernameSetup from "./components/UsernameSetup";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:4000";
 
@@ -47,17 +50,28 @@ export default function App() {
 
   const toggleTheme = () => setTheme(t => t === "dark" ? "light" : "dark");
 
-  // ─── Mode ──────────────────────────────────────────────────────────────────
-  const [mode, setMode] = useState("live"); // "live" | "strava"
+  // ─── Navigation ────────────────────────────────────────────────────────────
+  const [activeTab, setActiveTab] = useState("capture"); // "capture" | "leaderboard" | "profile"
+  const [stravaMode, setStravaMode] = useState(false); // sub-mode inside capture tab
 
   // ─── Guest User (for Live Capture — no auth required) ──────────────────────
   const [guestUser, setGuestUser] = useState(null);
   const [guestLoading, setGuestLoading] = useState(false);
+  const [showSetup, setShowSetup] = useState(false);
 
   useEffect(() => {
     let stored = localStorage.getItem("rw_guest_user");
     if (stored) {
-      setGuestUser(JSON.parse(stored));
+      const parsed = JSON.parse(stored);
+      setGuestUser(parsed);
+      // Detect old users who never set a username (auto-generated "runner_xxx" or "Anonymous")
+      const isOldUser = !parsed.username
+        || parsed.username.startsWith("runner_")
+        || parsed.firstname === "Anonymous"
+        || parsed.needsSetup === true;
+      if (isOldUser && parsed.needsSetup !== false) {
+        setShowSetup(true);
+      }
       return;
     }
     // Auto-register as guest
@@ -77,11 +91,19 @@ export default function App() {
         if (!user.error) {
           localStorage.setItem("rw_guest_user", JSON.stringify(user));
           setGuestUser(user);
+          if (user.needsSetup) setShowSetup(true);
         }
       })
       .catch(err => console.warn("[GUEST] registration failed:", err))
       .finally(() => setGuestLoading(false));
   }, []);
+
+  function handleSetupComplete(updatedUser) {
+    const merged = { ...guestUser, ...updatedUser, needsSetup: false };
+    localStorage.setItem("rw_guest_user", JSON.stringify(merged));
+    setGuestUser(merged);
+    setShowSetup(false);
+  }
 
   // ─── Strava User (only for Strava Sync) ────────────────────────────────────
   const [stravaUser, setStravaUser] = useState(null);
@@ -98,7 +120,7 @@ export default function App() {
         if (tokenParam) localStorage.setItem("rw_strava_token", tokenParam);
         setStravaUser(user);
         window.history.replaceState({}, document.title, "/");
-        setMode("strava"); // Auto-switch to strava mode after login
+        setStravaMode(true);
       } catch (err) {
         console.error("Failed to parse strava user param", err);
       }
@@ -151,8 +173,8 @@ export default function App() {
   }, [stravaUser]);
 
   useEffect(() => {
-    if (stravaUser && mode === "strava") loadTerritory("me");
-  }, [stravaUser, mode]);
+    if (stravaUser && stravaMode) loadTerritory("me");
+  }, [stravaUser, stravaMode]);
 
   // ─── Strava Sync ───────────────────────────────────────────────────────────
   const [syncing, setSyncing] = useState(false);
@@ -189,6 +211,7 @@ export default function App() {
     setCurrentTiles([]);
     setHistoryTiles([]);
     setRoutes([]);
+    setStravaMode(false);
   }
 
   function handleRunEnd(summary) {
@@ -197,222 +220,205 @@ export default function App() {
 
   // ─── Render ────────────────────────────────────────────────────────────────
   return (
-    <div style={{ minHeight: "100vh", padding: "16px", fontFamily: "var(--font)" }}>
-      <div style={{ maxWidth: "1280px", margin: "0 auto", display: "flex", flexDirection: "column", gap: "20px" }}>
+    <div className="app-shell">
 
-        {/* ── HEADER ── */}
-        <header className="glass" style={{ padding: "16px 24px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "12px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
-            <div style={{
-              width: "44px", height: "44px", borderRadius: "14px",
-              background: "linear-gradient(135deg, var(--indigo), var(--indigo-mid))",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: "22px", boxShadow: "0 4px 12px rgba(99,102,241,.35)",
-              flexShrink: 0,
-            }}>🏃</div>
-            <div>
-              <h1 style={{ fontSize: "22px", fontWeight: 900, color: "var(--txt)", letterSpacing: "-0.02em", lineHeight: 1.1 }}>
-                Ruwalk
-              </h1>
-              <p style={{ fontSize: "12px", color: "var(--txt3)", fontWeight: 500 }}>
-                Capture the world, one run at a time
-              </p>
-            </div>
+      {/* ── USERNAME SETUP MODAL ── */}
+      {showSetup && guestUser && (
+        <UsernameSetup guestUser={guestUser} onComplete={handleSetupComplete} />
+      )}
+
+      {/* ── HEADER ── */}
+      <header className="app-header glass">
+        <div className="header-left">
+          <div className="header-logo">🏃</div>
+          <div>
+            <h1 className="header-title">Ruwalk</h1>
+            <p className="header-subtitle">Capture the world, one run at a time</p>
           </div>
+        </div>
 
-          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-            {/* Theme Toggle */}
-            <button
-              id="theme-toggle"
-              onClick={toggleTheme}
-              className="btn btn-ghost btn-icon"
-              title={theme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"}
-            >
-              {theme === "dark" ? <SunIcon /> : <MoonIcon />}
-            </button>
+        <div className="header-right">
+          {/* Theme Toggle */}
+          <button
+            id="theme-toggle"
+            onClick={toggleTheme}
+            className="btn btn-ghost btn-icon"
+            title={theme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"}
+          >
+            {theme === "dark" ? <SunIcon /> : <MoonIcon />}
+          </button>
 
-            {/* Guest badge */}
-            {guestUser && mode === "live" && (
-              <span className="badge badge-guest hide-mobile" style={{ padding: "6px 12px" }}>
-                👤 {guestUser.username}
-              </span>
-            )}
+          {/* Guest badge (only on capture tab) */}
+          {guestUser && activeTab === "capture" && !stravaMode && (
+            <span className="badge badge-guest hide-small">
+              {guestUser.emoji || "🏃"} {guestUser.username}
+            </span>
+          )}
 
-            {/* Strava user info + logout (only visible in strava mode) */}
-            {stravaUser ? (
-              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                {stravaUser.profile && (
-                  <img src={stravaUser.profile} alt="Profile"
-                    style={{ width: "36px", height: "36px", borderRadius: "50%", border: "2px solid var(--border2)" }} />
-                )}
-                <div className="hide-mobile" style={{ textAlign: "right" }}>
-                  <p style={{ fontSize: "13px", fontWeight: 700, color: "var(--txt)" }}>
-                    {stravaUser.firstname} {stravaUser.lastname}
-                  </p>
-                  <p style={{ fontSize: "11px", color: "var(--txt3)" }}>Strava Connected</p>
-                </div>
-                <button onClick={handleStravaLogout} className="btn btn-ghost btn-sm" style={{ gap: "6px" }}>
-                  <LogoutIcon /> <span className="hide-mobile">Disconnect</span>
-                </button>
+          {/* Strava user info + logout */}
+          {stravaUser && stravaMode ? (
+            <div className="header-strava-info">
+              {stravaUser.profile && (
+                <img src={stravaUser.profile} alt="Profile" className="header-avatar" />
+              )}
+              <div className="hide-small" style={{ textAlign: "right" }}>
+                <p style={{ fontSize: "13px", fontWeight: 700, color: "var(--txt)" }}>
+                  {stravaUser.firstname} {stravaUser.lastname}
+                </p>
+                <p style={{ fontSize: "11px", color: "var(--txt3)" }}>Strava Connected</p>
               </div>
-            ) : mode === "strava" ? (
-              <a href={`${API_URL}/strava/login`} className="btn btn-orange" id="strava-connect-btn">
-                <StravaIcon /> Connect Strava
-              </a>
-            ) : null}
-          </div>
-        </header>
-
-        {/* ── MODE SWITCHER ── */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "12px" }}>
-          <div className="tabs">
-            <button
-              id="tab-live"
-              className={`tab ${mode === "live" ? "active-live" : ""}`}
-              onClick={() => setMode("live")}
-            >
-              📍 Live Capture
-            </button>
-            <button
-              id="tab-strava"
-              className={`tab ${mode === "strava" ? "active-strava" : ""}`}
-              onClick={() => setMode("strava")}
-            >
-              <StravaIcon /> Strava Sync
-            </button>
-          </div>
-
-          {/* Strava mode actions */}
-          {mode === "strava" && stravaUser && (
-            <div style={{ display: "flex", gap: "8px" }}>
-              <button
-                id="sync-btn"
-                onClick={handleSync}
-                disabled={syncing}
-                className="btn btn-orange btn-sm"
-              >
-                {syncing ? <><span className="spinner" style={{ width: "14px", height: "14px", borderTopColor: "white" }} /> Syncing…</> : <><RefreshIcon /> Sync Latest</>}
+              <button onClick={handleStravaLogout} className="btn btn-ghost btn-sm" style={{ gap: "6px" }}>
+                <LogoutIcon /> <span className="hide-small">Disconnect</span>
               </button>
-              <button
-                id="my-map-btn"
-                onClick={() => loadTerritory("me")}
-                disabled={loadingTerritory}
-                className="btn btn-ghost btn-sm"
-              >
-                My Map
-              </button>
+            </div>
+          ) : null}
+        </div>
+      </header>
+
+      {/* ── MAIN CONTENT ── */}
+      <main className="app-main">
+        <div className="app-content">
+
+          {/* ═══ CAPTURE TAB ═══ */}
+          {activeTab === "capture" && (
+            <div className="animate-fade-slide">
+              {/* Mode switcher (Live / Strava) */}
+              <div className="mode-switcher">
+                <div className="tabs">
+                  <button
+                    id="tab-live"
+                    className={`tab ${!stravaMode ? "active-live" : ""}`}
+                    onClick={() => setStravaMode(false)}
+                  >
+                    📍 Live Capture
+                  </button>
+                  <button
+                    id="tab-strava"
+                    className={`tab ${stravaMode ? "active-strava" : ""}`}
+                    onClick={() => setStravaMode(true)}
+                  >
+                    <StravaIcon /> Strava
+                  </button>
+                </div>
+
+                {/* Strava mode actions */}
+                {stravaMode && stravaUser && (
+                  <div style={{ display: "flex", gap: "8px" }}>
+                    <button
+                      id="sync-btn"
+                      onClick={handleSync}
+                      disabled={syncing}
+                      className="btn btn-orange btn-sm"
+                    >
+                      {syncing ? <><span className="spinner" style={{ width: "14px", height: "14px", borderTopColor: "white" }} /> Syncing…</> : <><RefreshIcon /> Sync</>}
+                    </button>
+                    <button
+                      id="my-map-btn"
+                      onClick={() => loadTerritory("me")}
+                      disabled={loadingTerritory}
+                      className="btn btn-ghost btn-sm"
+                    >
+                      My Map
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* ── LIVE CAPTURE MODE ── */}
+              {!stravaMode && (
+                <div className="glass capture-card">
+                  <div className="capture-header">
+                    <div>
+                      <h2 className="capture-title">Live Territory Capture</h2>
+                      <p className="capture-desc">
+                        Walk or run to capture H3 hexagons in real-time
+                      </p>
+                    </div>
+                    <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                      <span className="badge badge-live">
+                        <span className="dot" /> LIVE
+                      </span>
+                      {guestLoading && <span className="spinner" />}
+                    </div>
+                  </div>
+                  <LiveTrackingMap
+                    currentUser={guestUser}
+                    onRunEnd={handleRunEnd}
+                  />
+                </div>
+              )}
+
+              {/* ── STRAVA SYNC MODE ── */}
+              {stravaMode && (
+                <div className="animate-fade-slide">
+                  {!stravaUser ? (
+                    <div className="glass">
+                      <div className="empty-state">
+                        <div className="empty-icon">🔗</div>
+                        <p className="empty-title">Connect Strava to View Your Territory</p>
+                        <p className="empty-desc">
+                          Sync your past Strava runs to see which H3 tiles you own across the world map.
+                        </p>
+                        <a href={`${API_URL}/strava/login`} className="btn btn-orange btn-lg" id="strava-login-main">
+                          <StravaIcon /> Connect with Strava
+                        </a>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="glass" style={{ overflow: "hidden", position: "relative" }}>
+                      {loadingTerritory && (
+                        <div className="map-loading-overlay">
+                          <span className="spinner spinner-lg" />
+                        </div>
+                      )}
+                      <TerritoryMap
+                        currentTiles={currentTiles}
+                        historyTiles={historyTiles}
+                        routes={routes}
+                      />
+                      <div className="tile-stats-row">
+                        <div className="tile-stat">
+                          <div className="tile-stat-dot" style={{ background: "var(--indigo)" }} />
+                          <span>{currentTiles.length} Owned Tiles</span>
+                        </div>
+                        <div className="tile-stat">
+                          <div className="tile-stat-dot" style={{ background: "var(--txt3)" }} />
+                          <span>{historyTiles.length} Historical</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
+
+          {/* ═══ LEADERBOARD TAB ═══ */}
+          {activeTab === "leaderboard" && (
+            <div className="animate-fade-slide">
+              <Leaderboard
+                currentUserId={stravaUser?.id || guestUser?.id}
+                onSelectUser={(userId) => {
+                  setStravaMode(true);
+                  setActiveTab("capture");
+                  loadTerritory(userId);
+                }}
+              />
+            </div>
+          )}
+
+          {/* ═══ PROFILE TAB ═══ */}
+          {activeTab === "profile" && (
+            <div className="animate-fade-slide">
+              <Profile currentUser={guestUser} />
+            </div>
+          )}
+
         </div>
+      </main>
 
-        {/* ── MAIN GRID ── */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "20px" }}
-          className="main-grid">
-
-          {/* Left column: map + info */}
-          <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-
-            {/* ── LIVE CAPTURE MODE ── */}
-            {mode === "live" && (
-              <div className="glass animate-fade-slide" style={{ padding: "20px" }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px", flexWrap: "wrap", gap: "8px" }}>
-                  <div>
-                    <h2 style={{ fontSize: "18px", fontWeight: 800, color: "var(--txt)" }}>Live Territory Capture</h2>
-                    <p style={{ fontSize: "12px", color: "var(--txt3)", marginTop: "2px" }}>
-                      Walk or run to capture H3 hexagons in real-time — no login needed
-                    </p>
-                  </div>
-                  <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-                    <span className="badge badge-live">
-                      <span className="dot" /> LIVE
-                    </span>
-                    {guestLoading && <span className="spinner" />}
-                  </div>
-                </div>
-                <LiveTrackingMap
-                  currentUser={guestUser}
-                  onRunEnd={handleRunEnd}
-                />
-              </div>
-            )}
-
-            {/* ── STRAVA SYNC MODE ── */}
-            {mode === "strava" && (
-              <div className="animate-fade-slide" style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-
-                {!stravaUser ? (
-                  <div className="glass">
-                    <div className="empty-state">
-                      <div className="empty-icon">🔗</div>
-                      <p className="empty-title">Connect Strava to View Your Territory</p>
-                      <p className="empty-desc">
-                        Sync your past Strava runs to see which H3 tiles you own across the world map.
-                      </p>
-                      <a href={`${API_URL}/strava/login`} className="btn btn-orange btn-lg" id="strava-login-main">
-                        <StravaIcon /> Connect with Strava
-                      </a>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="glass" style={{ overflow: "hidden", position: "relative" }}>
-                    {loadingTerritory && (
-                      <div style={{
-                        position: "absolute", inset: 0, zIndex: 10,
-                        background: "rgba(0,0,0,0.15)", backdropFilter: "blur(4px)",
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                      }}>
-                        <span className="spinner spinner-lg" />
-                      </div>
-                    )}
-                    <TerritoryMap
-                      currentTiles={currentTiles}
-                      historyTiles={historyTiles}
-                      routes={routes}
-                    />
-
-                    {/* Tile stats */}
-                    <div style={{ padding: "16px 20px", display: "flex", gap: "16px", flexWrap: "wrap" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                        <div style={{ width: "10px", height: "10px", borderRadius: "3px", background: "var(--indigo)" }} />
-                        <span style={{ fontSize: "13px", fontWeight: 600, color: "var(--txt2)" }}>
-                          {currentTiles.length} Owned Tiles
-                        </span>
-                      </div>
-                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                        <div style={{ width: "10px", height: "10px", borderRadius: "3px", background: "var(--txt3)" }} />
-                        <span style={{ fontSize: "13px", fontWeight: 600, color: "var(--txt2)" }}>
-                          {historyTiles.length} Historical
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-          </div>
-
-          {/* Right column: Leaderboard */}
-          <div>
-            <Leaderboard
-              currentUserId={stravaUser?.id || guestUser?.id}
-              onSelectUser={(userId) => {
-                setMode("strava");
-                loadTerritory(userId);
-              }}
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* ── RESPONSIVE GRID STYLE ── */}
-      <style>{`
-        @media (min-width: 1024px) {
-          .main-grid {
-            grid-template-columns: 1fr 340px !important;
-          }
-        }
-      `}</style>
+      {/* ── BOTTOM NAV ── */}
+      <BottomNav activeTab={activeTab} onTabChange={setActiveTab} />
     </div>
   );
 }

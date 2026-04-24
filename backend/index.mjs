@@ -235,11 +235,13 @@ app.get("/leaderboard", async (req, res) => {
     const users = await prisma.user.findMany({
       select: {
         id: true,
-        stravaAthleteId: true, // 👈 CRITICAL: missing this was causing 500 error
+        stravaAthleteId: true,
         firstname: true,
         lastname: true,
         username: true,
+        emoji: true,
         profile: true,
+        isGuest: true,
         tiles: {
           select: { tileId: true }
         },
@@ -265,7 +267,9 @@ app.get("/leaderboard", async (req, res) => {
         firstname: u.firstname,
         lastname: u.lastname,
         username: u.username,
+        emoji: u.emoji || "🏃",
         profile: u.profile,
+        isGuest: u.isGuest,
         tiles: tileCount,
         totalKm: Number(totalKm.toFixed(2))
       };
@@ -1070,25 +1074,35 @@ app.post("/dev/seed-routes", async (req, res) => {
  */
 app.post("/live/guest-register", async (req, res) => {
   try {
-    const { guestId, name } = req.body;
+    const { guestId, username, emoji } = req.body;
     if (!guestId) return res.status(400).json({ error: "Missing guestId" });
+
+    // Validate username if provided
+    if (username) {
+      if (username.length > 8) return res.status(400).json({ error: "Username must be 8 characters or less" });
+      if (/\s/.test(username)) return res.status(400).json({ error: "Username cannot contain spaces" });
+      if (!/^[a-zA-Z0-9_\-.!@#$%^&*]+$/.test(username)) return res.status(400).json({ error: "Username contains invalid characters" });
+    }
 
     let user;
     try {
       user = await prisma.user.upsert({
         where: { guestId },
-        update: {},
+        update: {
+          ...(username ? { username, firstname: username } : {}),
+          ...(emoji ? { emoji } : {}),
+        },
         create: {
           guestId,
           isGuest: true,
-          firstname: name || "Anonymous",
-          lastname: "Runner",
-          username: `runner_${guestId.slice(0, 6)}`,
+          firstname: username || "Anonymous",
+          lastname: "",
+          username: username || `runner_${guestId.slice(0, 6)}`,
+          emoji: emoji || "🏃",
         }
       });
     } catch (upsertError) {
       if (upsertError.code === 'P2002') {
-        // Concurrent creation (React Strict Mode double fetch)
         user = await prisma.user.findUnique({ where: { guestId } });
       } else {
         throw upsertError;
@@ -1102,11 +1116,207 @@ app.post("/live/guest-register", async (req, res) => {
       firstname: user.firstname,
       lastname: user.lastname,
       username: user.username,
-      isGuest: true
+      emoji: user.emoji || "🏃",
+      isGuest: true,
+      needsSetup: !user.username || user.username.startsWith("runner_"),
     });
   } catch (err) {
     console.error("[ERROR] guest-register:", err.message);
     res.status(500).json({ error: "Failed to register guest user" });
+  }
+});
+
+/**
+ * POST /live/update-profile
+ * Updates username and emoji for a guest user.
+ */
+app.post("/live/update-profile", async (req, res) => {
+  try {
+    const userId = parseInt(req.headers["x-user-id"]);
+    if (!userId || isNaN(userId)) return res.status(400).json({ error: "Missing x-user-id" });
+
+    const { username, emoji } = req.body;
+
+    // Validate username
+    if (!username) return res.status(400).json({ error: "Username is required" });
+    if (username.length > 8) return res.status(400).json({ error: "Username must be 8 characters or less" });
+    if (/\s/.test(username)) return res.status(400).json({ error: "Username cannot contain spaces" });
+    if (!/^[a-zA-Z0-9_\-.!@#$%^&*]+$/.test(username)) return res.status(400).json({ error: "Username contains invalid characters" });
+
+    const user = await prisma.user.update({
+      where: { id: userId },
+      data: {
+        username,
+        firstname: username,
+        emoji: emoji || "🏃",
+      }
+    });
+
+    res.json({
+      id: user.id,
+      username: user.username,
+      firstname: user.firstname,
+      emoji: user.emoji,
+      isGuest: user.isGuest,
+      needsSetup: false,
+    });
+  } catch (err) {
+    console.error("[ERROR] update-profile:", err.message);
+    res.status(500).json({ error: "Failed to update profile" });
+  }
+});
+
+// ========== XP / LEVEL SYSTEM ==========
+const LEVEL_THRESHOLDS = [
+  { level: 1, xp: 0, title: "Newbie" },
+  { level: 2, xp: 100, title: "Walker" },
+  { level: 3, xp: 300, title: "Explorer" },
+  { level: 4, xp: 600, title: "Adventurer" },
+  { level: 5, xp: 1000, title: "Conqueror" },
+  { level: 6, xp: 1500, title: "Warlord" },
+  { level: 7, xp: 2500, title: "Legend" },
+  { level: 8, xp: 4000, title: "Titan" },
+  { level: 9, xp: 6000, title: "Mythic" },
+  { level: 10, xp: 10000, title: "Immortal" },
+];
+
+function getLevelInfo(xp) {
+  let current = LEVEL_THRESHOLDS[0];
+  let next = LEVEL_THRESHOLDS[1];
+  for (let i = LEVEL_THRESHOLDS.length - 1; i >= 0; i--) {
+    if (xp >= LEVEL_THRESHOLDS[i].xp) {
+      current = LEVEL_THRESHOLDS[i];
+      next = LEVEL_THRESHOLDS[i + 1] || null;
+      break;
+    }
+  }
+  return { level: current.level, title: current.title, xp, nextLevelXp: next ? next.xp : null, nextTitle: next ? next.title : null };
+}
+
+/**
+ * GET /live/profile
+ * Returns full profile with stats, XP, level, missions, and run history.
+ */
+app.get("/live/profile", async (req, res) => {
+  try {
+    const userId = parseInt(req.headers["x-user-id"]);
+    if (!userId || isNaN(userId)) return res.status(400).json({ error: "Missing x-user-id" });
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        tiles: { select: { tileId: true } },
+        activities: { orderBy: { createdAt: "desc" }, take: 50 },
+        historyCaptured: { select: { tileId: true, previousUser: true } },
+      }
+    });
+
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    // Calculate stats
+    const totalTiles = user.tiles.length;
+    const totalRuns = user.activities.length;
+    const totalDistanceM = user.activities.reduce((s, a) => s + (a.distanceM || 0), 0);
+    const totalKm = Number((totalDistanceM / 1000).toFixed(2));
+    const tilesStolen = user.historyCaptured.filter(h => h.previousUser !== null).length;
+
+    // Calculate XP: 10 per tile, 20 per km, 25 per stolen tile
+    const xp = (totalTiles * 10) + Math.floor(totalKm * 20) + (tilesStolen * 25);
+    const levelInfo = getLevelInfo(xp);
+
+    // Compute missions
+    const runDistances = user.activities.filter(a => a.captured).map(a => a.distanceM || 0);
+    const runTileCounts = [];
+    // We'll compute per-run tile counts from activities
+    for (const act of user.activities) {
+      const count = await prisma.tileHistory.count({ where: { activityId: act.id, newUser: userId } });
+      runTileCounts.push(count);
+    }
+
+    // Check leaderboard position
+    const allUsers = await prisma.user.findMany({
+      select: { id: true, tiles: { select: { tileId: true } } }
+    });
+    const sorted = allUsers.map(u => ({ id: u.id, count: u.tiles.length })).sort((a, b) => b.count - a.count);
+    const rank = sorted.findIndex(u => u.id === userId) + 1;
+
+    const missions = [
+      {
+        id: "first_2km",
+        icon: "🏁",
+        title: "First Steps",
+        desc: "Finish your first 2km run/walk",
+        xpReward: 100,
+        completed: runDistances.some(d => d >= 2000),
+        progress: Math.min(100, Math.round((Math.max(...runDistances, 0) / 2000) * 100)),
+      },
+      {
+        id: "capture_5",
+        icon: "🗺️",
+        title: "Territory Starter",
+        desc: "Capture at least 5 tiles",
+        xpReward: 150,
+        completed: totalTiles >= 5,
+        progress: Math.min(100, Math.round((totalTiles / 5) * 100)),
+      },
+      {
+        id: "steal_2",
+        icon: "⚔️",
+        title: "The Conqueror",
+        desc: "Steal 2 tiles from other users",
+        xpReward: 200,
+        completed: tilesStolen >= 2,
+        progress: Math.min(100, Math.round((tilesStolen / 2) * 100)),
+      },
+      {
+        id: "top_3",
+        icon: "📈",
+        title: "Climbing Up",
+        desc: "Reach top 3 on the leaderboard",
+        xpReward: 300,
+        completed: rank > 0 && rank <= 3,
+        progress: rank > 0 ? Math.min(100, Math.round(((sorted.length - rank + 1) / sorted.length) * 100)) : 0,
+      },
+      {
+        id: "beat_prev",
+        icon: "🔥",
+        title: "Personal Best",
+        desc: "Capture more tiles than your previous run",
+        xpReward: 100,
+        completed: runTileCounts.length >= 2 && runTileCounts[0] > runTileCounts[1],
+        progress: runTileCounts.length >= 2 ? Math.min(100, Math.round((runTileCounts[0] / Math.max(runTileCounts[1], 1)) * 100)) : 0,
+      },
+    ];
+
+    // Add mission XP to total
+    const missionXp = missions.filter(m => m.completed).reduce((s, m) => s + m.xpReward, 0);
+    const finalXp = xp + missionXp;
+    const finalLevel = getLevelInfo(finalXp);
+
+    res.json({
+      user: {
+        id: user.id,
+        username: user.username,
+        emoji: user.emoji || "🏃",
+        firstname: user.firstname,
+        isGuest: user.isGuest,
+      },
+      stats: { totalTiles, totalKm, totalRuns, tilesStolen, rank },
+      xp: finalXp,
+      level: finalLevel,
+      missions,
+      history: user.activities.slice(0, 20).map(a => ({
+        id: a.id,
+        name: a.name,
+        source: a.source,
+        distanceM: Math.round(a.distanceM || 0),
+        date: a.createdAt,
+        captured: a.captured,
+      })),
+    });
+  } catch (err) {
+    console.error("[ERROR] live/profile:", err.message);
+    res.status(500).json({ error: "Failed to load profile" });
   }
 });
 
@@ -1308,14 +1518,15 @@ app.get("/live/world-tiles", async (req, res) => {
       select: {
         tileId: true,
         userId: true,
-        user: { select: { firstname: true, lastname: true } }
+        user: { select: { firstname: true, lastname: true, username: true, emoji: true } }
       },
     });
 
     res.json(tiles.map(t => ({
       tileId: t.tileId,
       userId: t.userId,
-      ownerName: t.user ? `${t.user.firstname || ""} ${t.user.lastname || ""}`.trim() : "Unknown"
+      ownerName: t.user?.username || `${t.user?.firstname || ""} ${t.user?.lastname || ""}`.trim() || "Unknown",
+      ownerEmoji: t.user?.emoji || "🏃",
     })));
 
   } catch (err) {

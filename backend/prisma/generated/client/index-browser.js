@@ -126,6 +126,7 @@ exports.Prisma.UserScalarFieldEnum = {
   guestId: 'guestId',
   isGuest: 'isGuest',
   username: 'username',
+  emoji: 'emoji',
   firstname: 'firstname',
   lastname: 'lastname',
   profile: 'profile',

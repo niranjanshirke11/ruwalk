@@ -10,9 +10,9 @@ const RefreshIcon = () => (
 );
 
 const RANK_STYLES = [
-  { bg: "rgba(251,191,36,0.15)", color: "#d97706", icon: "🥇" },
-  { bg: "rgba(156,163,175,0.15)", color: "#6b7280", icon: "🥈" },
-  { bg: "rgba(251,146,60,0.15)", color: "#ea580c", icon: "🥉" },
+  { bg: "rgba(251,191,36,0.15)", color: "#d97706", icon: "🥇", glow: "rgba(251,191,36,0.3)" },
+  { bg: "rgba(156,163,175,0.15)", color: "#6b7280", icon: "🥈", glow: "rgba(156,163,175,0.3)" },
+  { bg: "rgba(251,146,60,0.15)", color: "#ea580c", icon: "🥉", glow: "rgba(251,146,60,0.3)" },
 ];
 
 export default function Leaderboard({ currentUserId, onSelectUser }) {
@@ -36,14 +36,12 @@ export default function Leaderboard({ currentUserId, onSelectUser }) {
   useEffect(() => { fetchLeaderboard(); }, []);
 
   return (
-    <div className="glass" style={{ padding: "20px", height: "100%", display: "flex", flexDirection: "column" }}>
+    <div className="glass leaderboard-container">
       {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "18px" }}>
+      <div className="leaderboard-header">
         <div>
-          <h2 style={{ fontSize: "18px", fontWeight: 800, color: "var(--txt)", letterSpacing: "-0.01em" }}>
-            🏆 Rankings
-          </h2>
-          <p style={{ fontSize: "11px", color: "var(--txt3)", marginTop: "2px" }}>Top territory capturers</p>
+          <h2 className="leaderboard-title">🏆 Rankings</h2>
+          <p className="leaderboard-subtitle">Top territory capturers</p>
         </div>
         <button
           id="leaderboard-refresh-btn"
@@ -58,16 +56,11 @@ export default function Leaderboard({ currentUserId, onSelectUser }) {
       </div>
 
       {/* Leaderboard list */}
-      <div style={{ flex: 1, overflow: "hidden", overflowY: "auto" }}>
+      <div className="leaderboard-list">
         {loading && data.length === 0 ? (
           <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
             {[1, 2, 3, 4, 5].map(i => (
-              <div key={i} style={{
-                height: "60px", borderRadius: "var(--r-md)",
-                background: "var(--surface2)",
-                animation: "pulse-dot 1.4s ease infinite",
-                animationDelay: `${i * 0.1}s`,
-              }} />
+              <div key={i} className="skeleton-row" style={{ animationDelay: `${i * 0.1}s` }} />
             ))}
           </div>
         ) : data.length === 0 ? (
@@ -79,11 +72,12 @@ export default function Leaderboard({ currentUserId, onSelectUser }) {
             </p>
           </div>
         ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+          <div className="leaderboard-items">
             {data.map((user, index) => {
               const isMe = String(user.id) === String(currentUserId);
               const rank = RANK_STYLES[index] || null;
-              const name = `${user.firstname || ""} ${user.lastname || ""}`.trim() || "Anonymous";
+              const displayName = user.username || "Anonymous";
+              const emoji = user.emoji || "🏃";
               const tiles = user.tiles ?? 0;
               const km = user.totalKm ?? 0;
 
@@ -92,47 +86,39 @@ export default function Leaderboard({ currentUserId, onSelectUser }) {
                   key={user.id}
                   id={`leaderboard-user-${user.id}`}
                   onClick={() => onSelectUser && onSelectUser(user.id)}
-                  style={{
-                    display: "flex", alignItems: "center", justifyContent: "space-between",
-                    padding: "10px 12px", borderRadius: "var(--r-md)",
-                    background: isMe ? "var(--indigo-light)" : "transparent",
-                    border: isMe ? "1px solid rgba(99,102,241,0.25)" : "1px solid transparent",
-                    cursor: "pointer", transition: "all var(--t)",
-                    fontFamily: "var(--font)", textAlign: "left", width: "100%",
-                  }}
-                  onMouseEnter={e => { if (!isMe) e.currentTarget.style.background = "var(--surface2)"; }}
-                  onMouseLeave={e => { if (!isMe) e.currentTarget.style.background = "transparent"; }}
+                  className={`leaderboard-row ${isMe ? "leaderboard-row-me" : ""}`}
                 >
-                  <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                  <div className="leaderboard-row-left">
                     {/* Rank badge */}
-                    <div style={{
-                      width: "34px", height: "34px", borderRadius: "10px", flexShrink: 0,
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      fontSize: rank ? "18px" : "13px", fontWeight: 800,
+                    <div className="leaderboard-rank" style={{
                       background: rank ? rank.bg : "var(--surface2)",
                       color: rank ? rank.color : "var(--txt3)",
+                      boxShadow: rank ? `0 0 12px ${rank.glow}` : "none",
                     }}>
                       {rank ? rank.icon : index + 1}
                     </div>
 
-                    {/* User info */}
-                    <div>
-                      <p style={{ fontSize: "13px", fontWeight: 700, color: "var(--txt)", lineHeight: 1.2 }}>
-                        {name} {isMe && <span style={{ fontSize: "10px", color: "var(--indigo)", fontWeight: 800 }}>(you)</span>}
+                    {/* User emoji + info */}
+                    <div className="leaderboard-user-avatar">{emoji}</div>
+                    <div className="leaderboard-user-info">
+                      <p className="leaderboard-user-name">
+                        {displayName}
+                        {isMe && <span className="leaderboard-you-tag">(you)</span>}
                       </p>
-                      <p style={{ fontSize: "11px", color: "var(--txt3)", marginTop: "1px" }}>
-                        @{user.username || "runner"} {user.isGuest ? "• guest" : ""}
+                      <p className="leaderboard-user-handle">
+                        @{user.username || "runner"}
+                        {user.isGuest ? " • guest" : ""}
                       </p>
                     </div>
                   </div>
 
                   {/* Stats */}
-                  <div style={{ textAlign: "right", flexShrink: 0 }}>
-                    <p style={{ fontSize: "15px", fontWeight: 900, color: "var(--txt)", lineHeight: 1.1 }}>
+                  <div className="leaderboard-row-right">
+                    <p className="leaderboard-tiles">
                       {tiles}
-                      <span style={{ fontSize: "10px", fontWeight: 600, color: "var(--txt3)", marginLeft: "3px" }}>tiles</span>
+                      <span className="leaderboard-tiles-label">tiles</span>
                     </p>
-                    <p style={{ fontSize: "10px", color: "var(--txt3)", marginTop: "1px" }}>{km} km</p>
+                    <p className="leaderboard-km">{km} km</p>
                   </div>
                 </button>
               );
@@ -143,7 +129,7 @@ export default function Leaderboard({ currentUserId, onSelectUser }) {
 
       {/* Footer tip */}
       <div className="divider" />
-      <p style={{ fontSize: "11px", color: "var(--txt3)", textAlign: "center" }}>
+      <p className="leaderboard-footer">
         Click a player to see their territory
       </p>
     </div>

@@ -110,6 +110,7 @@ export default function LiveTrackingMap({ currentUser, onRunEnd }) {
           color:  colorForUser(t.userId, myId),
           isMe:   String(t.userId) === String(myId),
           name:   t.ownerName,
+          emoji:  t.ownerEmoji || "🏃",
         },
         geometry: { type: "Polygon", coordinates: [boundary] },
       };
@@ -135,7 +136,7 @@ export default function LiveTrackingMap({ currentUser, onRunEnd }) {
         const p = e.features[0].properties;
         new maplibregl.Popup({ closeButton: false, closeOnClick: true })
           .setLngLat(e.lngLat)
-          .setHTML(`<div style="font-family:Inter,sans-serif;font-size:13px;font-weight:700">${p.isMe ? "🏆 Your tile" : `👤 ${p.name}`}</div>`)
+          .setHTML(`<div style="font-family:Inter,sans-serif;font-size:13px;font-weight:700">${p.isMe ? "🏆 Your tile" : `${p.emoji} ${p.name}`}</div>`)
           .addTo(map);
       });
 

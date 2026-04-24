@@ -14,6 +14,7 @@ model User {
   guestId         String?  @unique // UUID for anonymous/guest users
   isGuest         Boolean  @default(false)
   username        String?
+  emoji           String?  @default("🏃") // user's chosen emoji avatar
   firstname       String?
   lastname        String?
   profile         String?

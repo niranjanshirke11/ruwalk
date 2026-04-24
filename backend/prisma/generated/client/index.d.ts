@@ -1251,6 +1251,7 @@ export namespace Prisma {
     guestId: string | null
     isGuest: boolean | null
     username: string | null
+    emoji: string | null
     firstname: string | null
     lastname: string | null
     profile: string | null
@@ -1263,6 +1264,7 @@ export namespace Prisma {
     guestId: string | null
     isGuest: boolean | null
     username: string | null
+    emoji: string | null
     firstname: string | null
     lastname: string | null
     profile: string | null
@@ -1275,6 +1277,7 @@ export namespace Prisma {
     guestId: number
     isGuest: number
     username: number
+    emoji: number
     firstname: number
     lastname: number
     profile: number
@@ -1299,6 +1302,7 @@ export namespace Prisma {
     guestId?: true
     isGuest?: true
     username?: true
+    emoji?: true
     firstname?: true
     lastname?: true
     profile?: true
@@ -1311,6 +1315,7 @@ export namespace Prisma {
     guestId?: true
     isGuest?: true
     username?: true
+    emoji?: true
     firstname?: true
     lastname?: true
     profile?: true
@@ -1323,6 +1328,7 @@ export namespace Prisma {
     guestId?: true
     isGuest?: true
     username?: true
+    emoji?: true
     firstname?: true
     lastname?: true
     profile?: true
@@ -1422,6 +1428,7 @@ export namespace Prisma {
     guestId: string | null
     isGuest: boolean
     username: string | null
+    emoji: string | null
     firstname: string | null
     lastname: string | null
     profile: string | null
@@ -1453,6 +1460,7 @@ export namespace Prisma {
     guestId?: boolean
     isGuest?: boolean
     username?: boolean
+    emoji?: boolean
     firstname?: boolean
     lastname?: boolean
     profile?: boolean
@@ -1470,6 +1478,7 @@ export namespace Prisma {
     guestId?: boolean
     isGuest?: boolean
     username?: boolean
+    emoji?: boolean
     firstname?: boolean
     lastname?: boolean
     profile?: boolean
@@ -1482,6 +1491,7 @@ export namespace Prisma {
     guestId?: boolean
     isGuest?: boolean
     username?: boolean
+    emoji?: boolean
     firstname?: boolean
     lastname?: boolean
     profile?: boolean
@@ -1494,13 +1504,14 @@ export namespace Prisma {
     guestId?: boolean
     isGuest?: boolean
     username?: boolean
+    emoji?: boolean
     firstname?: boolean
     lastname?: boolean
     profile?: boolean
     createdAt?: boolean
   }
 
-  export type UserOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "stravaAthleteId" | "guestId" | "isGuest" | "username" | "firstname" | "lastname" | "profile" | "createdAt", ExtArgs["result"]["user"]>
+  export type UserOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "stravaAthleteId" | "guestId" | "isGuest" | "username" | "emoji" | "firstname" | "lastname" | "profile" | "createdAt", ExtArgs["result"]["user"]>
   export type UserInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     activities?: boolean | User$activitiesArgs<ExtArgs>
     tiles?: boolean | User$tilesArgs<ExtArgs>
@@ -1525,6 +1536,7 @@ export namespace Prisma {
       guestId: string | null
       isGuest: boolean
       username: string | null
+      emoji: string | null
       firstname: string | null
       lastname: string | null
       profile: string | null
@@ -1961,6 +1973,7 @@ export namespace Prisma {
     readonly guestId: FieldRef<"User", 'String'>
     readonly isGuest: FieldRef<"User", 'Boolean'>
     readonly username: FieldRef<"User", 'String'>
+    readonly emoji: FieldRef<"User", 'String'>
     readonly firstname: FieldRef<"User", 'String'>
     readonly lastname: FieldRef<"User", 'String'>
     readonly profile: FieldRef<"User", 'String'>
@@ -6031,6 +6044,7 @@ export namespace Prisma {
     guestId: 'guestId',
     isGuest: 'isGuest',
     username: 'username',
+    emoji: 'emoji',
     firstname: 'firstname',
     lastname: 'lastname',
     profile: 'profile',
@@ -6200,6 +6214,7 @@ export namespace Prisma {
     guestId?: StringNullableFilter<"User"> | string | null
     isGuest?: BoolFilter<"User"> | boolean
     username?: StringNullableFilter<"User"> | string | null
+    emoji?: StringNullableFilter<"User"> | string | null
     firstname?: StringNullableFilter<"User"> | string | null
     lastname?: StringNullableFilter<"User"> | string | null
     profile?: StringNullableFilter<"User"> | string | null
@@ -6216,6 +6231,7 @@ export namespace Prisma {
     guestId?: SortOrderInput | SortOrder
     isGuest?: SortOrder
     username?: SortOrderInput | SortOrder
+    emoji?: SortOrderInput | SortOrder
     firstname?: SortOrderInput | SortOrder
     lastname?: SortOrderInput | SortOrder
     profile?: SortOrderInput | SortOrder
@@ -6235,6 +6251,7 @@ export namespace Prisma {
     NOT?: UserWhereInput | UserWhereInput[]
     isGuest?: BoolFilter<"User"> | boolean
     username?: StringNullableFilter<"User"> | string | null
+    emoji?: StringNullableFilter<"User"> | string | null
     firstname?: StringNullableFilter<"User"> | string | null
     lastname?: StringNullableFilter<"User"> | string | null
     profile?: StringNullableFilter<"User"> | string | null
@@ -6251,6 +6268,7 @@ export namespace Prisma {
     guestId?: SortOrderInput | SortOrder
     isGuest?: SortOrder
     username?: SortOrderInput | SortOrder
+    emoji?: SortOrderInput | SortOrder
     firstname?: SortOrderInput | SortOrder
     lastname?: SortOrderInput | SortOrder
     profile?: SortOrderInput | SortOrder
@@ -6271,6 +6289,7 @@ export namespace Prisma {
     guestId?: StringNullableWithAggregatesFilter<"User"> | string | null
     isGuest?: BoolWithAggregatesFilter<"User"> | boolean
     username?: StringNullableWithAggregatesFilter<"User"> | string | null
+    emoji?: StringNullableWithAggregatesFilter<"User"> | string | null
     firstname?: StringNullableWithAggregatesFilter<"User"> | string | null
     lastname?: StringNullableWithAggregatesFilter<"User"> | string | null
     profile?: StringNullableWithAggregatesFilter<"User"> | string | null
@@ -6507,6 +6526,7 @@ export namespace Prisma {
     guestId?: string | null
     isGuest?: boolean
     username?: string | null
+    emoji?: string | null
     firstname?: string | null
     lastname?: string | null
     profile?: string | null
@@ -6523,6 +6543,7 @@ export namespace Prisma {
     guestId?: string | null
     isGuest?: boolean
     username?: string | null
+    emoji?: string | null
     firstname?: string | null
     lastname?: string | null
     profile?: string | null
@@ -6538,6 +6559,7 @@ export namespace Prisma {
     guestId?: NullableStringFieldUpdateOperationsInput | string | null
     isGuest?: BoolFieldUpdateOperationsInput | boolean
     username?: NullableStringFieldUpdateOperationsInput | string | null
+    emoji?: NullableStringFieldUpdateOperationsInput | string | null
     firstname?: NullableStringFieldUpdateOperationsInput | string | null
     lastname?: NullableStringFieldUpdateOperationsInput | string | null
     profile?: NullableStringFieldUpdateOperationsInput | string | null
@@ -6554,6 +6576,7 @@ export namespace Prisma {
     guestId?: NullableStringFieldUpdateOperationsInput | string | null
     isGuest?: BoolFieldUpdateOperationsInput | boolean
     username?: NullableStringFieldUpdateOperationsInput | string | null
+    emoji?: NullableStringFieldUpdateOperationsInput | string | null
     firstname?: NullableStringFieldUpdateOperationsInput | string | null
     lastname?: NullableStringFieldUpdateOperationsInput | string | null
     profile?: NullableStringFieldUpdateOperationsInput | string | null
@@ -6570,6 +6593,7 @@ export namespace Prisma {
     guestId?: string | null
     isGuest?: boolean
     username?: string | null
+    emoji?: string | null
     firstname?: string | null
     lastname?: string | null
     profile?: string | null
@@ -6581,6 +6605,7 @@ export namespace Prisma {
     guestId?: NullableStringFieldUpdateOperationsInput | string | null
     isGuest?: BoolFieldUpdateOperationsInput | boolean
     username?: NullableStringFieldUpdateOperationsInput | string | null
+    emoji?: NullableStringFieldUpdateOperationsInput | string | null
     firstname?: NullableStringFieldUpdateOperationsInput | string | null
     lastname?: NullableStringFieldUpdateOperationsInput | string | null
     profile?: NullableStringFieldUpdateOperationsInput | string | null
@@ -6593,6 +6618,7 @@ export namespace Prisma {
     guestId?: NullableStringFieldUpdateOperationsInput | string | null
     isGuest?: BoolFieldUpdateOperationsInput | boolean
     username?: NullableStringFieldUpdateOperationsInput | string | null
+    emoji?: NullableStringFieldUpdateOperationsInput | string | null
     firstname?: NullableStringFieldUpdateOperationsInput | string | null
     lastname?: NullableStringFieldUpdateOperationsInput | string | null
     profile?: NullableStringFieldUpdateOperationsInput | string | null
@@ -6914,6 +6940,7 @@ export namespace Prisma {
     guestId?: SortOrder
     isGuest?: SortOrder
     username?: SortOrder
+    emoji?: SortOrder
     firstname?: SortOrder
     lastname?: SortOrder
     profile?: SortOrder
@@ -6931,6 +6958,7 @@ export namespace Prisma {
     guestId?: SortOrder
     isGuest?: SortOrder
     username?: SortOrder
+    emoji?: SortOrder
     firstname?: SortOrder
     lastname?: SortOrder
     profile?: SortOrder
@@ -6943,6 +6971,7 @@ export namespace Prisma {
     guestId?: SortOrder
     isGuest?: SortOrder
     username?: SortOrder
+    emoji?: SortOrder
     firstname?: SortOrder
     lastname?: SortOrder
     profile?: SortOrder
@@ -8053,6 +8082,7 @@ export namespace Prisma {
     guestId?: string | null
     isGuest?: boolean
     username?: string | null
+    emoji?: string | null
     firstname?: string | null
     lastname?: string | null
     profile?: string | null
@@ -8068,6 +8098,7 @@ export namespace Prisma {
     guestId?: string | null
     isGuest?: boolean
     username?: string | null
+    emoji?: string | null
     firstname?: string | null
     lastname?: string | null
     profile?: string | null
@@ -8123,6 +8154,7 @@ export namespace Prisma {
     guestId?: NullableStringFieldUpdateOperationsInput | string | null
     isGuest?: BoolFieldUpdateOperationsInput | boolean
     username?: NullableStringFieldUpdateOperationsInput | string | null
+    emoji?: NullableStringFieldUpdateOperationsInput | string | null
     firstname?: NullableStringFieldUpdateOperationsInput | string | null
     lastname?: NullableStringFieldUpdateOperationsInput | string | null
     profile?: NullableStringFieldUpdateOperationsInput | string | null
@@ -8138,6 +8170,7 @@ export namespace Prisma {
     guestId?: NullableStringFieldUpdateOperationsInput | string | null
     isGuest?: BoolFieldUpdateOperationsInput | boolean
     username?: NullableStringFieldUpdateOperationsInput | string | null
+    emoji?: NullableStringFieldUpdateOperationsInput | string | null
     firstname?: NullableStringFieldUpdateOperationsInput | string | null
     lastname?: NullableStringFieldUpdateOperationsInput | string | null
     profile?: NullableStringFieldUpdateOperationsInput | string | null
@@ -8168,6 +8201,7 @@ export namespace Prisma {
     guestId?: string | null
     isGuest?: boolean
     username?: string | null
+    emoji?: string | null
     firstname?: string | null
     lastname?: string | null
     profile?: string | null
@@ -8183,6 +8217,7 @@ export namespace Prisma {
     guestId?: string | null
     isGuest?: boolean
     username?: string | null
+    emoji?: string | null
     firstname?: string | null
     lastname?: string | null
     profile?: string | null
@@ -8213,6 +8248,7 @@ export namespace Prisma {
     guestId?: NullableStringFieldUpdateOperationsInput | string | null
     isGuest?: BoolFieldUpdateOperationsInput | boolean
     username?: NullableStringFieldUpdateOperationsInput | string | null
+    emoji?: NullableStringFieldUpdateOperationsInput | string | null
     firstname?: NullableStringFieldUpdateOperationsInput | string | null
     lastname?: NullableStringFieldUpdateOperationsInput | string | null
     profile?: NullableStringFieldUpdateOperationsInput | string | null
@@ -8228,6 +8264,7 @@ export namespace Prisma {
     guestId?: NullableStringFieldUpdateOperationsInput | string | null
     isGuest?: BoolFieldUpdateOperationsInput | boolean
     username?: NullableStringFieldUpdateOperationsInput | string | null
+    emoji?: NullableStringFieldUpdateOperationsInput | string | null
     firstname?: NullableStringFieldUpdateOperationsInput | string | null
     lastname?: NullableStringFieldUpdateOperationsInput | string | null
     profile?: NullableStringFieldUpdateOperationsInput | string | null
@@ -8242,6 +8279,7 @@ export namespace Prisma {
     guestId?: string | null
     isGuest?: boolean
     username?: string | null
+    emoji?: string | null
     firstname?: string | null
     lastname?: string | null
     profile?: string | null
@@ -8257,6 +8295,7 @@ export namespace Prisma {
     guestId?: string | null
     isGuest?: boolean
     username?: string | null
+    emoji?: string | null
     firstname?: string | null
     lastname?: string | null
     profile?: string | null
@@ -8276,6 +8315,7 @@ export namespace Prisma {
     guestId?: string | null
     isGuest?: boolean
     username?: string | null
+    emoji?: string | null
     firstname?: string | null
     lastname?: string | null
     profile?: string | null
@@ -8291,6 +8331,7 @@ export namespace Prisma {
     guestId?: string | null
     isGuest?: boolean
     username?: string | null
+    emoji?: string | null
     firstname?: string | null
     lastname?: string | null
     profile?: string | null
@@ -8359,6 +8400,7 @@ export namespace Prisma {
     guestId?: NullableStringFieldUpdateOperationsInput | string | null
     isGuest?: BoolFieldUpdateOperationsInput | boolean
     username?: NullableStringFieldUpdateOperationsInput | string | null
+    emoji?: NullableStringFieldUpdateOperationsInput | string | null
     firstname?: NullableStringFieldUpdateOperationsInput | string | null
     lastname?: NullableStringFieldUpdateOperationsInput | string | null
     profile?: NullableStringFieldUpdateOperationsInput | string | null
@@ -8374,6 +8416,7 @@ export namespace Prisma {
     guestId?: NullableStringFieldUpdateOperationsInput | string | null
     isGuest?: BoolFieldUpdateOperationsInput | boolean
     username?: NullableStringFieldUpdateOperationsInput | string | null
+    emoji?: NullableStringFieldUpdateOperationsInput | string | null
     firstname?: NullableStringFieldUpdateOperationsInput | string | null
     lastname?: NullableStringFieldUpdateOperationsInput | string | null
     profile?: NullableStringFieldUpdateOperationsInput | string | null
@@ -8399,6 +8442,7 @@ export namespace Prisma {
     guestId?: NullableStringFieldUpdateOperationsInput | string | null
     isGuest?: BoolFieldUpdateOperationsInput | boolean
     username?: NullableStringFieldUpdateOperationsInput | string | null
+    emoji?: NullableStringFieldUpdateOperationsInput | string | null
     firstname?: NullableStringFieldUpdateOperationsInput | string | null
     lastname?: NullableStringFieldUpdateOperationsInput | string | null
     profile?: NullableStringFieldUpdateOperationsInput | string | null
@@ -8414,6 +8458,7 @@ export namespace Prisma {
     guestId?: NullableStringFieldUpdateOperationsInput | string | null
     isGuest?: BoolFieldUpdateOperationsInput | boolean
     username?: NullableStringFieldUpdateOperationsInput | string | null
+    emoji?: NullableStringFieldUpdateOperationsInput | string | null
     firstname?: NullableStringFieldUpdateOperationsInput | string | null
     lastname?: NullableStringFieldUpdateOperationsInput | string | null
     profile?: NullableStringFieldUpdateOperationsInput | string | null

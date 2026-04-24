@@ -5,3 +5,4 @@ TESTING_GUIDE.md
 .aider*
 .aiderignore
 .aider_env
+.json*
